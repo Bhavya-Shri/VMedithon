@@ -8,6 +8,12 @@ Standing rules (2026-09-15):
 - Append this log every time files change.
 - STEW labels never used to fit classifier, scaler, z-score, or EA.
 
+LIMIT (do not forget):
+- EEGMAT on disk is a SAMPLE only: subjects 00, 01, 02 (6 EDFs). Full PhysioNet set is ~36 subjects. We stopped the full pull for Review 1.
+- `eegmat_epochs.npz` (712, 10, 256) is from those 3 people only. Phase 6 is done for the sample, not for the full source set.
+- LOSO >= 0.70 on 3 subjects is a smoke test, NOT the Guide hard gate. Pull remaining EEGMAT EDFs before quoting a source-model number to judges.
+- STEW is the FULL set: 48 subjects, 96 txt files. No sample limit on the target side.
+
 ---
 
 ## Phase 1 -- repo scaffold -- 2026-09-15
@@ -105,7 +111,7 @@ No preprocess (filter/epoch) yet -- Guide: audit before rest of preprocess.
 
 ## Phase 6 -- EEGMAT preprocess -- 2026-09-15
 
-What: `src/preprocess.py` -- reref_p3, filter_resample, make_epochs, reject_ptp, process_eegmat_file, build_npz. Ran on 3 local subjects.
+What: `src/preprocess.py` -- reref_p3, filter_resample, make_epochs, reject_ptp, process_eegmat_file, build_npz. Ran on 3 local subjects ONLY (see LIMIT).
 Order: drop ECG -> canonicalize -> montage warn -> P3 reref -> drop P3 -> pick SHARED_CH -> notch 50 -> 1-40 Hz firwin zero-phase -> resample 128 -> *1e6 uV -> 2 s / 1 s stride -> PTP 200 uV.
 npz: `data/processed/eegmat_epochs.npz` (gitignored)
 ```
