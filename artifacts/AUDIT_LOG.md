@@ -316,3 +316,16 @@ Streamlit: four pages, no proxy banner, one-window slider fix.
 LIMIT: earlier Cursor-cloud entries (3-subject sample, 20-subject LOSO 0.635,
 proxy winner E) are historical. Official slide numbers are this block.
 
+---
+
+## Hardware simulation doc -- 2026-09-16
+
+What: added `HARDWARE_SIMULATION.md` (demo talk sheet). No new 3D code.
+Decision: **2D only**. 3D is possible in Plotly but Guide Page 2 says do not start in 3D; cut order cuts 3D first. A rotating headset that does not move P(load) is filler.
+Simulation that ships (already in `app/streamlit_app.py`):
+1. Page 2 -- Neurocom vs EPOC 2D scalps (green SHARED_CH, gold P3 CMS match, grey blind) + `slider_degrade` on a clinical epoch. Same frozen scaler/clf. P(load) should fall toward 0.5.
+2. Page 1 -- real STEW before (pipeline A) vs after (winner C, unlabeled z-score).
+3. Page 3 -- ablation table; winner C (acc 0.650 / F1 0.647), A is the collapse.
+Do not add live Bluetooth, extra headsets, or a second simulator.
+
+
