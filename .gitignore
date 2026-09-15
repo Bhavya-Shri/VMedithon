@@ -1,0 +1,10 @@
+# Raw PhysioNet / IEEE DataPort downloads -- too large, and not ours to republish
+data/raw/
+# Derived epochs -- rebuilt by `python -m src.run_all`
+data/processed/
+# Trained sklearn objects -- regenerated, not source
+artifacts/*.joblib
+__pycache__/
+.venv/
+*.pyc
+.Python
