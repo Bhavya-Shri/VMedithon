@@ -133,7 +133,24 @@ Guide step 3 vs 4: rename before montage (step 3 says "after renaming"). Logged,
 96 txt files, 48 subjects (01-48), each lo+hi. Nested under `data/raw/stew/STEW Dataset/`.
 All 96 have 14 numeric columns, no header, (19200, 14) = 150 s at 128 Hz.
 Units: thousands with DC offset, NOT Volts, do not *1e6. lo/hi unused for fitting.
-Download is complete. Phase 7 (STEW preprocess) not run yet.
+Download is complete. Phase 7 ran after this entry.
+
+---
+
+## Phase 7 -- STEW preprocess -- 2026-09-15
+
+What: `process_stew_file` -- pick 10 SHARED_CH, NO P3 reref, same FIR 1-40 Hz + 50 Hz notch as EEGMAT, 128 Hz, 2 s epochs, PTP 200/300.
+Why: wearable already CMS-referenced; we only lock montage/rate/band.
+npz: `data/processed/stew_epochs.npz` (gitignored)
+```
+X (10265, 10, 256) float32  min/max -243.3 / 241.0 uV
+y (10265,) int8  rest=5214 load=5051  EVAL ONLY
+n_subj 48  ch=SHARED_CH  sfreq=128
+assert EEGMAT ch/shape == STEW ch/shape == (10, 256) OK
+```
+DC offset gone after band-pass (thousands -> tens/hundreds of uV). Do not *1e6.
+PTP: 33 files loosened to 300 uV. 4 recordings fully dropped (100% PTP): sub01_lo, sub23_hi, sub38_hi, sub41_lo. Those subjects still have the other condition. Wearable is noisier -- expected, not a unit bug.
+P3 not in STEW ch list.
 
 ---
 
