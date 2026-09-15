@@ -95,3 +95,6 @@ SHARED_CH column indices: [2, 11, 1, 12, 4, 9, 5, 8, 6, 7]
   F3=2 F4=11 F7=1 F8=12 T7=4 T8=9 P7=5 P8=8 O1=6 O2=7
 discard: AF3, AF4, FC5, FC6
 NO P3 column -- already CMS in hardware; do not re-reference.
+=== STEW rerun (WSL, 2026-09-15) ===
+96 txt files on disk (sub*.txt). Real IEEE STEW, not proxy.
+EEGMAT LOSO used 36 subjects. target_source=stew in train_meta.json.

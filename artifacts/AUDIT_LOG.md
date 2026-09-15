@@ -288,3 +288,31 @@ To get official EEGMAT→STEW numbers: put `sub##_lo.txt` / `sub##_hi.txt` in
 `data/raw/stew/`, delete `data/processed/stew_epochs.npz`, re-run
 `python -m src.run_all`.
 
+---
+
+## Real STEW rerun -- phases 6, 9-16 -- 2026-09-15 (WSL)
+
+What: full EEGMAT (36 subjects) + real STEW (96 txt). `python -m src.run_all`.
+STEW labels still unused for classifier / scaler / z-score / EA fit.
+This block supersedes the proxy "executed" tables above. Do not quote proxy A–E.
+
+Phase 9 LOSO (EEGMAT only):
+- n_train_subjects 36, n_train_epochs 8548
+- logreg + source EA: acc **0.663**, macro-F1 **0.614**
+- Guide gate LOSO >= 0.70: **not met**. Frozen anyway. Do not retune on STEW.
+
+Phases 10-12 STEW ablation (`target_source=stew`, n=10265):
+
+| Pipeline | Acc | Macro-F1 | Kappa |
+|---|---:|---:|---:|
+| A naive port | 0.508 | 0.368 | 0.030 |
+| C z-score | **0.650** | **0.647** | 0.302 |
+| D z-score+EA | 0.638 | 0.638 | 0.276 |
+| E fake-Emotiv train + D | 0.640 | 0.637 | 0.281 |
+
+Winner **C**. Beats SCVCNet ghost 62.9% on accuracy.
+Streamlit: four pages, no proxy banner, one-window slider fix.
+
+LIMIT: earlier Cursor-cloud entries (3-subject sample, 20-subject LOSO 0.635,
+proxy winner E) are historical. Official slide numbers are this block.
+
