@@ -1,5 +1,5 @@
 GAP-Align channel / unit audit
-Updated: 2026-09-15  (Phase 5, SAMPLE ONLY -- not full datasets)
+Updated: 2026-09-15  (Phase 5 sample kept; Phase 6 rerun = 20 EEGMAT subjects below)
 
 SHARED_CH contract:
 F3, F4, F7, F8, T7, T8, P7, P8, O1, O2
@@ -61,8 +61,23 @@ Mapping (file -> canonicalize -> keep/drop):
   EEG A2-A1  -> A2-A1   drop (linked-ear reference channel)
   ECG ECG    -> ECG ECG drop (non-EEG)
 
-=== STEW (IEEE DataPort txt) ===
-folder: data/raw/stew/STEW Dataset/   (nested; io_stew rglob finds them)
+=== EEGMAT preprocess rerun (Phase 6, 2026-09-15 this environment) ===
+PhysioNet EDFs on disk at run_all: 40 files, subjects 00-19 (20 people).
+Not the full 36. Not the Review-1 3-subject sample.
+npz data/processed/eegmat_epochs.npz (gitignored):
+  X (4784, 10, 256) float32 uV @ 128 Hz
+  y rest=3576 load=1208
+  P3 re-ref then dropped; SHARED_CH order locked
+  peak -150.9 / 114.5 uV  --> unit_ok
+
+=== STEW (this environment) ===
+No txt files under data/raw/stew/. IEEE DataPort not downloaded here.
+run_all wrote a PROXY npz from degraded EEGMAT. Evaluation y is EEGMAT labels
+copied onto the proxy -- still unused in adapter/classifier fit.
+Do not quote ablation A-E as STEW. Original Phase 7 audit (48 subjects / 96
+files) remains true for the machine that had the IEEE zip, not this one.
+
+=== STEW original Phase 7 audit (IEEE zip on the first machine; not this env) ===
 subjects: 48 -> 01..48
 files: 96  (48 lo + 48 hi)
 all first-line column counts: 14  (no 13-col header/index problem)
