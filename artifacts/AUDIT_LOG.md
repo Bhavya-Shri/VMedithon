@@ -103,6 +103,25 @@ No preprocess (filter/epoch) yet -- Guide: audit before rest of preprocess.
 
 ---
 
+## Phase 6 -- EEGMAT preprocess -- 2026-09-15
+
+What: `src/preprocess.py` -- reref_p3, filter_resample, make_epochs, reject_ptp, process_eegmat_file, build_npz. Ran on 3 local subjects.
+Order: drop ECG -> canonicalize -> montage warn -> P3 reref -> drop P3 -> pick SHARED_CH -> notch 50 -> 1-40 Hz firwin zero-phase -> resample 128 -> *1e6 uV -> 2 s / 1 s stride -> PTP 200 uV.
+npz: `data/processed/eegmat_epochs.npz` (gitignored)
+```
+X (712, 10, 256) float32  min/max -101.5 / 107.6 uV
+y (712,) int8  rest=536  load=176
+subjects 00, 01, 02
+ch = SHARED_CH  sfreq=128
+P3 after reref max abs = 0.000 uV (dropped from ch)
+PTP drops: 0-11% per file; none hit 40% so thresh stayed 200 uV
+```
+Imbalance 536 vs 176 is longer rest EDFs (~182 s vs ~60 s task), not a label bug. class_weight=balanced later.
+STEW preprocess not started.
+Guide step 3 vs 4: rename before montage (step 3 says "after renaming"). Logged, not a method change.
+
+---
+
 ## Git
 
 Remote: https://github.com/Bhavya-Shri/VMedithon.git
