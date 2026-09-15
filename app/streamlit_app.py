@@ -123,10 +123,13 @@ def page_live(demo, meta, ablation) -> None:
         st.session_state.playing = play
     with c_ctrl2:
         if play:
-            st.caption(f"Streaming window {st.session_state.w_idx + 1} / {n_win}")
-            idx = st.session_state.w_idx
+            st.caption(f"Streaming window {st.session_state.get('w_idx', 0) + 1} / {n_win}")
+            idx = min(st.session_state.get("w_idx", 0), n_win - 1)
+        elif n_win <= 1:
+            st.caption("1 window for this subject")
+            idx = 0
         else:
-            idx = st.slider("Window", 0, n_win - 1, st.session_state.w_idx)
+            idx = st.slider("Window", 0, n_win - 1, st.session_state.get("w_idx", 0))
             st.session_state.w_idx = idx
 
     w = windows[idx]

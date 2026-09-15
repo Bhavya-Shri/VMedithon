@@ -1,87 +1,87 @@
 {
   "A": {
-    "acc": 0.3532608695652174,
-    "f1": 0.3505337912774046,
-    "kappa": 0.011976674641148377,
+    "acc": 0.5076473453482708,
+    "f1": 0.36816456526220986,
+    "kappa": 0.030013080787859803,
     "cm": [
       [
-        690,
-        2886
+        194,
+        5020
       ],
       [
-        208,
-        1000
+        34,
+        5017
       ]
     ],
-    "n": 4784,
-    "n_rest": 3576,
-    "n_load": 1208,
+    "n": 10265,
+    "n_rest": 5214,
+    "n_load": 5051,
     "both_classes_predicted": true,
     "train_extras": "none",
     "test_adapter": "none",
     "proves": "naive port / collapse"
   },
   "C": {
-    "acc": 0.5556020066889632,
-    "f1": 0.530316668695493,
-    "kappa": 0.12460890161947769,
+    "acc": 0.64997564539698,
+    "f1": 0.6473244763185417,
+    "kappa": 0.30204910665683604,
     "cm": [
       [
-        1884,
-        1692
+        2891,
+        2323
       ],
       [
-        434,
-        774
+        1270,
+        3781
       ]
     ],
-    "n": 4784,
-    "n_rest": 3576,
-    "n_load": 1208,
+    "n": 10265,
+    "n_rest": 5214,
+    "n_load": 5051,
     "both_classes_predicted": true,
     "train_extras": "P3 reref in EEGMAT preprocess",
     "test_adapter": "target z-score (unlabeled, per subject)",
     "proves": "gain / impedance"
   },
   "D": {
-    "acc": 0.564799331103679,
-    "f1": 0.545163667847563,
-    "kappa": 0.16252582978173835,
+    "acc": 0.6378957622990745,
+    "f1": 0.6377987446811457,
+    "kappa": 0.27635012177439344,
     "cm": [
       [
-        1848,
-        1728
+        3190,
+        2024
       ],
       [
-        354,
-        854
+        1693,
+        3358
       ]
     ],
-    "n": 4784,
-    "n_rest": 3576,
-    "n_load": 1208,
+    "n": 10265,
+    "n_rest": 5214,
+    "n_load": 5051,
     "both_classes_predicted": true,
     "train_extras": "same as C",
     "test_adapter": "z-score + Euclidean Alignment (unlabeled, per subject)",
     "proves": "spatial mixing"
   },
   "E": {
-    "acc": 0.5955267558528428,
-    "f1": 0.5669467209232317,
-    "kappa": 0.18344981567938934,
+    "acc": 0.6395518753044326,
+    "f1": 0.636778307699158,
+    "kappa": 0.28127955836099683,
     "cm": [
       [
-        2039,
-        1537
+        2834,
+        2380
       ],
       [
-        398,
-        810
+        1320,
+        3731
       ]
     ],
-    "n": 4784,
-    "n_rest": 3576,
-    "n_load": 1208,
+    "n": 10265,
+    "n_rest": 5214,
+    "n_load": 5051,
     "both_classes_predicted": true,
     "train_extras": "train-time fake_emotiv",
     "test_adapter": "z-score + EA",
@@ -91,8 +91,8 @@
     "skipped": true,
     "reason": "Tent needs BatchNorm layers; logistic regression / linear SVM does not use it."
   },
-  "winner": "E",
+  "winner": "C",
   "before": "A",
-  "target_source": "eegmat_degraded_proxy",
+  "target_source": "stew",
   "ghost_baseline_scvcnet": 0.629
 }

@@ -79,13 +79,14 @@ def plot_bands(features, names, title: str = "θ / α / β log band-power") -> g
                 marker_color=colors[band],
             )
         )
+    layout = {k: v for k, v in PLOTLY_LAYOUT.items() if k != "legend"}
     fig.update_layout(
-        **PLOTLY_LAYOUT,
+        **layout,
         title=title,
         barmode="group",
         height=260,
         yaxis_title="log10 PSD",
-        legend=dict(orientation="h", y=1.12),
+        legend=dict(bgcolor="rgba(0,0,0,0)", orientation="h", y=1.12),
     )
     return fig
 
