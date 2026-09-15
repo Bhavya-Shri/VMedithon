@@ -66,6 +66,22 @@ Leakage: n/a (no data loaded).
 
 ---
 
+## Phase 4 -- src/channels.py -- 2026-09-15
+
+What: `canonicalize`, `pick_shared`, `stew_column_index`. `CH_ALIAS` added to `config.py`.
+Why: Neurocom T3/T4/T5/T6 and `EEG F3` prefixes must become Emotiv T7/T8/P7/P8/F3 before any array math.
+Verification (`python -m src.channels`): all string asserts passed.
+```
+EEG T3 -> T7, EEG T4 -> T8, EEG T5 -> P7, EEG T6 -> P8, EEG F3 -> F3
+STEW col idx [2, 11, 1, 12, 4, 9, 5, 8, 6, 7]
+STEW -> shared ['F3', 'F4', 'F7', 'F8', 'T7', 'T8', 'P7', 'P8', 'O1', 'O2']
+unknown 'STI 014' kept; missing channels raise ValueError (no impute)
+```
+Arrays: none. `channel_audit.txt` still PENDING real EDF/txt headers.
+Not pushed: TwinBite / NeuroShift leftovers.
+
+---
+
 ## Git
 
 Remote: https://github.com/Bhavya-Shri/VMedithon.git

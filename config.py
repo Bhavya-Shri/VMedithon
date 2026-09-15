@@ -29,6 +29,9 @@ RANDOM_SEED = 42
 # Canonical 10 shared 10-20 sites (Emotiv names). Order is part of the contract.
 SHARED_CH = ["F3", "F4", "F7", "F8", "T7", "T8", "P7", "P8", "O1", "O2"]
 
+# Old 10-20 aliases (clinical EEGMAT) -> Emotiv / modern 10-20 (Guide §4).
+CH_ALIAS = {"T3": "T7", "T4": "T8", "T5": "P7", "T6": "P8"}
+
 # Clinical-only site we re-reference TO, then DROP (Emotiv CMS lives at P3).
 CLINICAL_REF = "P3"
 
