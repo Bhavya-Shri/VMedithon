@@ -159,3 +159,6 @@ P3 not in STEW ch list.
 Remote: https://github.com/Bhavya-Shri/VMedithon.git
 Branch: main
 Left untracked on purpose: TwinBite_Project_Design.md, NeuroShift_architecture_diagram.png, VMEDITHON_3.0_NeuroShift_Submission.pptx
+
+
+Next is Phase 8: 30-D log band-power features. Reply proceed for that. Do not compute a STEW accuracy until EEGMAT LOSO (Phase 9) passes.
