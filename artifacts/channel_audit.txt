@@ -62,11 +62,21 @@ Mapping (file -> canonicalize -> keep/drop):
   ECG ECG    -> ECG ECG drop (non-EEG)
 
 === STEW (IEEE DataPort txt) ===
-subjects: NOT DOWNLOADED
-reason: IEEE DataPort requires a free account. Guide: do not invent STEW,
-do not substitute another Emotiv set.
-Action: download sub##_lo.txt / sub##_hi.txt into data/raw/stew/
-URL: https://ieee-dataport.org/open-access/stew-simultaneous-task-eeg-workload-dataset
-DOI: 10.21227/44r8-ya50
-documented 14-col order (from Guide, not yet confirmed on disk):
+folder: data/raw/stew/STEW Dataset/   (nested; io_stew rglob finds them)
+subjects: 48 -> 01..48
+files: 96  (48 lo + 48 hi)
+all first-line column counts: 14  (no 13-col header/index problem)
+no header row: first line is numeric
+probe sub01_hi.txt: shape (19200, 14), duration 150.0 s at 128 Hz assumed
+probe sub01_lo.txt: shape (19200, 14), min 330.256 max 8001.03
+sub01_hi min/max: 2633.33 / 7816.41
+unit: NOT Volts. Do NOT *1e6.
+      Large DC offset (thousands) -- typical Emotiv raw export.
+      Band-pass 1-40 Hz in Phase 7 will remove DC; then expect tens of uV.
+      lo/hi in the filename = EVALUATION labels only. Not for adapter fit.
+documented 14-col order (Guide §4; txt has no names, we assign this order):
 AF3, F7, F3, FC5, T7, P7, O1, O2, P8, T8, FC6, F4, F8, AF4
+SHARED_CH column indices: [2, 11, 1, 12, 4, 9, 5, 8, 6, 7]
+  F3=2 F4=11 F7=1 F8=12 T7=4 T8=9 P7=5 P8=8 O1=6 O2=7
+discard: AF3, AF4, FC5, FC6
+NO P3 column -- already CMS in hardware; do not re-reference.

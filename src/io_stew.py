@@ -62,10 +62,15 @@ def load_txt(path: Path | str) -> np.ndarray:
 
 def _unit_guess(arr: np.ndarray) -> str:
     peak = float(max(abs(np.nanmin(arr)), abs(np.nanmax(arr))))
-    # Guide §5.3: +/-1e-4 -> Volts; +/-50 -> uV
+    # Guide §5.3: +/-1e-4 -> Volts; +/-50 -> uV. Emotiv STEW is often thousands with DC offset.
     if peak < 1e-1:
         return "Volts (values look like +/-1e-4 scale; multiply by 1e6)"
-    return "uV (values look like +/-50 scale; do not multiply)"
+    if peak < 500:
+        return "uV (values look like +/-50 scale; do not multiply)"
+    return (
+        "Emotiv raw with large DC offset (thousands). Do NOT multiply by 1e6. "
+        "Band-pass 1-40 Hz will remove DC; then expect tens of uV."
+    )
 
 
 def audit_one(path: Path) -> dict:

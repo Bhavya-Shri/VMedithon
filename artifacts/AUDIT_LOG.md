@@ -122,6 +122,15 @@ Guide step 3 vs 4: rename before montage (step 3 says "after renaming"). Logged,
 
 ---
 
+## Phase 5b -- STEW download confirmed -- 2026-09-15
+
+96 txt files, 48 subjects (01-48), each lo+hi. Nested under `data/raw/stew/STEW Dataset/`.
+All 96 have 14 numeric columns, no header, (19200, 14) = 150 s at 128 Hz.
+Units: thousands with DC offset, NOT Volts, do not *1e6. lo/hi unused for fitting.
+Download is complete. Phase 7 (STEW preprocess) not run yet.
+
+---
+
 ## Git
 
 Remote: https://github.com/Bhavya-Shri/VMedithon.git
