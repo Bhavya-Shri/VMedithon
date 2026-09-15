@@ -82,6 +82,27 @@ Not pushed: TwinBite / NeuroShift leftovers.
 
 ---
 
+## Phase 5 -- data sample + audit -- 2026-09-15
+
+What: stopped full 175 MB EEGMAT pull. Kept 2 subjects (00, 01), 4 EDFs.
+Why: Review 1 is immediate; full 36 subjects are not needed to prove channels/units.
+wfdb.dl_database failed: it requested Subject00_1.edf.hea (404). EEGMAT is EDF-only.
+Fallback: direct PhysioNet file URLs. Incomplete 0-byte files from the failed wfdb run were deleted.
+
+EEGMAT probe Subject00_1.edf (REAL header):
+```
+sfreq 500.0 Hz
+n_ch 21  duration 182.0 s  n_times 91000
+min/max V  -2.05e-4 / 6.55e-4   --> Volts, must *1e6
+P3 present; all SHARED_CH present after canonicalize
+EEG T3 -> T7, EEG T5 -> P7
+```
+STEW: not on disk. IEEE DataPort account required. Did not invent files.
+Also wrote `src/io_eegmat.py`, `src/io_stew.py`, `REVIEW_1_Presentation.md`.
+No preprocess (filter/epoch) yet -- Guide: audit before rest of preprocess.
+
+---
+
 ## Git
 
 Remote: https://github.com/Bhavya-Shri/VMedithon.git

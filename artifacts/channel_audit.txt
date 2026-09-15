@@ -1,33 +1,70 @@
 GAP-Align channel / unit audit
-Status: PENDING Phase 5 (data download)
+Updated: 2026-09-15  (Phase 5, SAMPLE ONLY -- not full datasets)
 
-This file must be filled from REAL file headers before the rest of preprocess.
-Do not invent channel names.
-
-SHARED_CH contract (config.py):
+SHARED_CH contract:
 F3, F4, F7, F8, T7, T8, P7, P8, O1, O2
 
-Expected alias map (not yet confirmed on disk):
+Alias map confirmed on real EEGMAT EDF:
 T3 -> T7
 T4 -> T8
 T5 -> P7
 T6 -> P8
-strip prefixes: "EEG ", "EEG", "EEG-"
+strip prefix "EEG "
 
-=== EEGMAT (PhysioNet EDF) ===
-subjects: (not downloaded)
-sfreq: (read from EDF header, expect ~500 Hz)
-channel names as in file: (print raw.ch_names of Subject00_1.edf)
-canonical names: (after canonicalize)
-P3 present: (yes/no; skip subject if no)
-units: MNE often returns Volts; convert to uV (* 1e6). log min/max.
+=== EEGMAT (PhysioNet EDF) -- SAMPLE ===
+Local files (hackathon-now, not the full 36 subjects):
+  Subject00_1.edf  rest
+  Subject00_2.edf  mental arithmetic
+  Subject01_1.edf  rest
+  Subject01_2.edf  mental arithmetic
+subjects on disk: 2 -> 00, 01
+EDF count: 4
+all sfreq: 500.0 Hz  (from EDF header, not assumed)
+all n_ch:  21
+probe: Subject00_1.edf
+  duration: 182.000 s  (Guide said ~60 s; THIS FILE is 182 s -- we log the header)
+  n_times:  91000  (= 182 * 500)
+  min/max V:  -2.050300e-04 / 6.549430e-04
+  min/max uV: -205.030 / 654.943
+  unit_guess: Volts  --> preprocess MUST multiply by 1e6
+P3 present: YES (EEG P3)
+SHARED missing: none
+
+raw.ch_names for Subject00_1.edf:
+['EEG Fp1', 'EEG Fp2', 'EEG F3', 'EEG F4', 'EEG F7', 'EEG F8',
+ 'EEG T3', 'EEG T4', 'EEG C3', 'EEG C4', 'EEG T5', 'EEG T6',
+ 'EEG P3', 'EEG P4', 'EEG O1', 'EEG O2', 'EEG Fz', 'EEG Cz',
+ 'EEG Pz', 'EEG A2-A1', 'ECG ECG']
+
+Mapping (file -> canonicalize -> keep/drop):
+  EEG Fp1    -> Fp1     drop (clinical-only)
+  EEG Fp2    -> Fp2     drop
+  EEG F3     -> F3      SHARED
+  EEG F4     -> F4      SHARED
+  EEG F7     -> F7      SHARED
+  EEG F8     -> F8      SHARED
+  EEG T3     -> T7      SHARED (alias)
+  EEG T4     -> T8      SHARED (alias)
+  EEG C3     -> C3      drop
+  EEG C4     -> C4      drop
+  EEG T5     -> P7      SHARED (alias)
+  EEG T6     -> P8      SHARED (alias)
+  EEG P3     -> P3      RE-REFERENCE then DROP (Emotiv CMS match)
+  EEG P4     -> P4      drop
+  EEG O1     -> O1      SHARED
+  EEG O2     -> O2      SHARED
+  EEG Fz     -> Fz      drop
+  EEG Cz     -> Cz      drop
+  EEG Pz     -> Pz      drop
+  EEG A2-A1  -> A2-A1   drop (linked-ear reference channel)
+  ECG ECG    -> ECG ECG drop (non-EEG)
 
 === STEW (IEEE DataPort txt) ===
-subjects: (not downloaded)
-columns: expect 14
-documented order: AF3, F7, F3, FC5, T7, P7, O1, O2, P8, T8, FC6, F4, F8, AF4
-sfreq: expect 128 Hz
-units: if values look like +/-1e-4 they are Volts; if +/-50 they are uV. log which.
-
-=== Mapping table (paste after first real load) ===
-(file name -> canonicalize -> keep/drop)
+subjects: NOT DOWNLOADED
+reason: IEEE DataPort requires a free account. Guide: do not invent STEW,
+do not substitute another Emotiv set.
+Action: download sub##_lo.txt / sub##_hi.txt into data/raw/stew/
+URL: https://ieee-dataport.org/open-access/stew-simultaneous-task-eeg-workload-dataset
+DOI: 10.21227/44r8-ya50
+documented 14-col order (from Guide, not yet confirmed on disk):
+AF3, F7, F3, FC5, T7, P7, O1, O2, P8, T8, FC6, F4, F8, AF4
