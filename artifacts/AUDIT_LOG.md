@@ -84,7 +84,7 @@ Not pushed: TwinBite / NeuroShift leftovers.
 
 ## Phase 5 -- data sample + audit -- 2026-09-15
 
-What: stopped full 175 MB EEGMAT pull. Kept 2 subjects (00, 01), 4 EDFs.
+What: stopped full 175 MB EEGMAT pull. Sample is now 3 subjects (00, 01, 02), 6 EDFs.
 Why: Review 1 is immediate; full 36 subjects are not needed to prove channels/units.
 wfdb.dl_database failed: it requested Subject00_1.edf.hea (404). EEGMAT is EDF-only.
 Fallback: direct PhysioNet file URLs. Incomplete 0-byte files from the failed wfdb run were deleted.

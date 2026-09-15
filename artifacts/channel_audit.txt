@@ -17,8 +17,10 @@ Local files (hackathon-now, not the full 36 subjects):
   Subject00_2.edf  mental arithmetic
   Subject01_1.edf  rest
   Subject01_2.edf  mental arithmetic
-subjects on disk: 2 -> 00, 01
-EDF count: 4
+  Subject02_1.edf  rest
+  Subject02_2.edf  mental arithmetic
+subjects on disk: 3 -> 00, 01, 02
+EDF count: 6
 all sfreq: 500.0 Hz  (from EDF header, not assumed)
 all n_ch:  21
 probe: Subject00_1.edf
