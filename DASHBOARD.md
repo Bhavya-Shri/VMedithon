@@ -137,7 +137,7 @@ Layout: **left clinical | center scores | right wearable**.
 
 Do not pick a STEW id and expect the left column to stay put. A previous bug always showed EEGMAT subject 27 (`clinical[0]`) because each STEW id had one window so the clinical index stayed 0.
 
-**After vs before looking “more different” from clinical:** that is expected. (1) Score After against the **STEW eval label**, not against the EEGMAT `P(load)`. Before often matches clinical only because **both collapsed to load**. (2) After band-power bars are **z-scored**; they are not on the same vertical scale as clinical log-power. Traces (voltage) do not change when you toggle After.
+**After vs before looking “more different” from clinical:** that is expected. Score After against the **STEW eval label**, not against EEGMAT `P(load)`. Before often matches clinical only because **both collapsed to load**. After bars are log-power of z-scored EEG — different y-axis. Page 1 now shows P(load) before and after vs STEW correct/wrong at all times.
 
 ### 4.2 Left column — Clinical · Neurocom / EEGMAT
 

@@ -178,11 +178,14 @@ def hardware_viewer_payload(demo, meta, ablation) -> dict:
     }
 
 
-def _pred_block(title: str, pred: int, proba, caption: str) -> None:
+def _pred_block(title: str, pred: int, proba, caption: str, true_y: int | None = None) -> None:
     p_load = float(proba[1])
     st.markdown(f"<div class='gap-kicker'>{title}</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='gap-pred'>{_label(pred)}</div>", unsafe_allow_html=True)
     st.progress(min(max(p_load, 0.0), 1.0), text=f"P(cognitive load) = {p_load:.2f}")
+    if true_y is not None:
+        ok = int(pred) == int(true_y)
+        st.caption(("Correct" if ok else "Wrong") + f" vs true {_label(true_y)}")
     st.caption(caption)
 
 
@@ -245,6 +248,13 @@ def page_live(demo, meta, ablation) -> None:
     mode = st.radio("Wearable view", ["Before GAP-Align", "After GAP-Align"], horizontal=True)
     show_after = mode.startswith("After")
     chart_key = f"p{pack_i}_{'a' if show_after else 'b'}"
+    ok_b = int(w["pred_before"]) == int(w["y"])
+    ok_a = int(w["pred_after"]) == int(w["y"])
+    st.info(
+        "GAP-Align does **not** copy the EEGMAT traces. After should match the **STEW eval label** "
+        "(right column), not the hospital person on the left. Before often *looks* like clinical "
+        "`P(load)` because both collapsed to load."
+    )
 
     left, center, right = st.columns([1.15, 0.85, 1.15])
     with left:
@@ -255,12 +265,18 @@ def page_live(demo, meta, ablation) -> None:
             key=f"clin_tr_{chart_key}",
         )
         st.plotly_chart(
-            plot_bands(c["features"], names, title="Clinical log band-power (not z-scored)"),
+            plot_bands(c["features"], names, title="Clinical log band-power (sensor µV)", yaxis_title="log10 PSD"),
             use_container_width=True,
             key=f"clin_bp_{chart_key}",
         )
-        _pred_block("Frozen model", c["pred"], c["proba"], "Hospital-grade stand-in · 19–23 ch wet · 500 Hz → aligned 10 ch 128 Hz")
-        st.caption(f"EEGMAT subject {c['subject']} · true label: {_label(c['y'])} · 2 s snapshot")
+        _pred_block(
+            "Frozen model",
+            c["pred"],
+            c["proba"],
+            "Different person, hospital device. This is not the target After should copy.",
+            true_y=c["y"],
+        )
+        st.caption(f"EEGMAT subject {c['subject']} · true label: {_label(c['y'])}")
 
     with right:
         st.subheader("Commercial · Emotiv / wearable")
@@ -274,19 +290,45 @@ def page_live(demo, meta, ablation) -> None:
             plot_bands(
                 feats,
                 names,
-                title="After z-score (scale ≠ clinical)" if show_after else "Before GAP-Align (raw log-power)",
+                title="After: log-power of z-scored EEG (not the clinical scale)"
+                if show_after
+                else "Before: raw log-power (same units as clinical, often still wrong)",
+                yaxis_title="log10 PSD of z-scored EEG" if show_after else "log10 PSD",
             ),
             use_container_width=True,
             key=f"wear_bp_{chart_key}",
         )
+        m1, m2 = st.columns(2)
+        m1.metric(
+            "P(load) before",
+            f"{float(w['proba_before'][1]):.2f}",
+            delta="correct" if ok_b else "wrong vs STEW",
+            delta_color="normal" if ok_b else "inverse",
+        )
+        m2.metric(
+            "P(load) after",
+            f"{float(w['proba_after'][1]):.2f}",
+            delta="correct" if ok_a else "wrong vs STEW",
+            delta_color="normal" if ok_a else "inverse",
+        )
         if show_after:
-            _pred_block("After GAP-Align", w["pred_after"], w["proba_after"], "Same frozen weights. Score this against the STEW eval label, not the EEGMAT column.")
+            _pred_block(
+                "After GAP-Align",
+                w["pred_after"],
+                w["proba_after"],
+                "Same frozen weights. Success = this matches STEW rest/load, not EEGMAT P(load).",
+                true_y=w["y"],
+            )
         else:
-            _pred_block("Before GAP-Align", w["pred_before"], w["proba_before"], "Naive port. Often stuck on load — that is the collapse.")
-        ok_b = int(w["pred_before"]) == int(w["y"])
-        ok_a = int(w["pred_after"]) == int(w["y"])
+            _pred_block(
+                "Before GAP-Align",
+                w["pred_before"],
+                w["proba_before"],
+                "Naive port. Rest windows often look like load — that is the collapse.",
+                true_y=w["y"],
+            )
         st.caption(
-            f"STEW subject {w['subject']} · eval label: {_label(w['y'])} (never used to fit) · "
+            f"STEW subject {w['subject']} · eval {_label(w['y'])} (never used to fit) · "
             f"before {'correct' if ok_b else 'wrong'} → after {'correct' if ok_a else 'wrong'}"
         )
 
@@ -301,6 +343,10 @@ def page_live(demo, meta, ablation) -> None:
         st.metric("Macro-F1 after", f"{after['f1']:.3f}")
         st.caption(f"Winner pipeline: {ablation['winner']}. Ghost baseline SCVCNet EEGMAT→STEW = 62.9% (real STEW only).")
         st.caption("True labels on the wearable score this window, not the clinical traces. Different people, same rest/load slot.")
+        st.caption(
+            f"This STEW clip: before {'correct' if ok_b else 'wrong'} → after {'correct' if ok_a else 'wrong'} "
+            f"vs {_label(w['y'])}. Official table above is n=10265, not this window."
+        )
 
 
 def page_sim(demo, scaler, clf, meta, ablation) -> None:

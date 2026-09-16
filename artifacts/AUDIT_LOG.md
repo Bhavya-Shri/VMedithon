@@ -344,6 +344,12 @@ Graphs: Page 3 is supposed to stay static (frozen `ablation.json`). Page 1 trace
 
 ---
 
+## Page 1 After-vs-clinical confusion -- 2026-09-16
+
+Not an adapter bug. After is closer to STEW y (demo 6/10 → 9/10; full acc 0.508 → 0.650), not to the EEGMAT window. UI now shows P(load) before/after vs STEW correct/wrong and labels After bars as z-scored log-power. Did not rebuild demo_windows (that rewire was reverted).
+
+---
+
 ## Dashboard explainer doc -- 2026-09-16
 
 Added `DASHBOARD.md`: every Streamlit control, plot, artifact, and official number (Pages 1-3). Linked from README. Does not change the scorer.
