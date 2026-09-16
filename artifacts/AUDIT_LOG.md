@@ -328,4 +328,17 @@ Simulation that ships (already in `app/streamlit_app.py`):
 3. Page 3 -- ablation table; winner C (acc 0.650 / F1 0.647), A is the collapse.
 Do not add live Bluetooth, extra headsets, or a second simulator.
 
+---
+
+## Teammate 3D viewer + India page -- 2026-09-16
+
+Pulled origin `ec06465` (PR #3 `nethrasrirs-main`: `eeg_workload_dashboard.html` + `main.py`).
+
+Compatibility: **visual yes, pipeline no.**
+
+- Her `main.py` trains SVM on STEW and tests EEGMAT (wrong direction), uses CORAL, writes `report.json`. GAP-Align is frozen logreg, EEGMAT→STEW, unlabeled z-score winner C. Those files stay in the repo but are **not** the official scorer.
+- 3D contradicts Guide Page 2 ("do not start in 3D"). User asked to put her hardware sim on the dashboard anyway. Streamlit Page 2 now embeds a GAP-Align-skinned copy at `app/hardware_viewer.html` (shared vs dropped nodes, P3 gold, CORAL/SVM metric bar hidden). Degrade slider still drives frozen `clf.joblib`.
+- India / access page removed per user. CDSCO one-liner kept in the sidebar (Guide cut-order: cut Page 4 polish, keep disclaimer).
+
+Graphs: Page 3 is supposed to stay static (frozen `ablation.json`). Page 1 traces are frozen 2 s snapshots (one window per demo subject); Play now cycles all demo windows. Page 2 3D rotates; rest/task toggles PSD; slider traces move with degrade.
 

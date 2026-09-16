@@ -12,19 +12,15 @@ streamlit run app/streamlit_app.py
 
 Use **Page 2 (Hardware simulation)** then **Page 1 (Live compare)** then **Page 3 (Ablation)**.
 
+Page 2 now embeds the teammate **3D montage** (`app/hardware_viewer.html`, from PR #3) plus the original **degrade slider**. The 3D head is schematic 10–20. Official accuracy is still Page 3 (pipeline C). Do **not** quote numbers from `main.py` (that file trains STEW→EEGMAT with CORAL/SVM — wrong direction).
+
 ---
 
 ## Is 3D possible?
 
-**Technically yes. For this project: do not.**
+**Technically yes.** Guide Page 2 said start in 2D. The teammate viewer is now embedded on Page 2 as a **montage cartoon**, not as the accuracy proof.
 
-- Implementation Guide Page 2: two **2D** scalps. “Do not start in 3D.”
-- Cut order if late: **cut 3D first**.
-- Design doc: a rotating 3D headset with no link to the accuracy number is filler.
-
-Plotly can draw 3D dots. That would not make the science stronger. The claim is: **each hardware gap changes the numbers the frozen model sees**. That is proven by (1) the degrade slider moving **P(load)** and (2) STEW **before vs after** GAP-Align. A spinning headset does not prove that.
-
-If a judge asks “why not 3D?”: “We spent the time tying the simulation to the same `fake_emotiv` / `slider_degrade` function the trainer uses, so the confidence drop is real, not a cartoon.”
+The claim is still: **each hardware gap changes the numbers the frozen model sees**. That is proven by (1) the degrade slider moving **P(load)** and (2) STEW **before vs after** GAP-Align. The rotating head does not replace those numbers.
 
 ---
 

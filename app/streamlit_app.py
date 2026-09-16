@@ -8,6 +8,8 @@ from pathlib import Path
 
 import numpy as np
 import streamlit as st
+import streamlit.components.v1 as components
+from scipy.signal import welch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -86,6 +88,96 @@ def _label(y: int) -> str:
     return "Rest" if int(y) == 0 else "Cognitive load"
 
 
+def _minmax(d: dict) -> dict:
+    if not d:
+        return {}
+    vals = list(d.values())
+    lo, hi = min(vals), max(vals)
+    span = (hi - lo) or 1.0
+    return {k: (v - lo) / span for k, v in d.items()}
+
+
+def _windows_for_y(windows, y: int) -> list:
+    return [w for w in windows if int(w.get("y", -1)) == int(y)]
+
+
+def _channel_activity(windows, feat_key: str, y: int, names: list[str]) -> dict:
+    rows = [np.asarray(w[feat_key], dtype=float) for w in _windows_for_y(windows, y) if feat_key in w]
+    if not rows:
+        return {}
+    mean = np.mean(np.stack(rows, axis=0), axis=0)
+    per_ch: dict[str, dict[str, float]] = {}
+    for i, name in enumerate(names):
+        ch, band = name.split("_", 1)
+        per_ch.setdefault(ch, {})[band] = float(mean[i])
+    raw = {}
+    for ch, bands in per_ch.items():
+        raw[ch] = bands.get("theta", 0.0) + bands.get("beta", 0.0) - bands.get("alpha", 0.0)
+    return _minmax(raw)
+
+
+def _psd_curve(windows, y: int, sfreq: float = 128.0) -> list:
+    xs = [np.asarray(w["x"], dtype=float) for w in _windows_for_y(windows, y) if "x" in w]
+    if not xs:
+        return []
+    X = np.stack(xs, axis=0)
+    nperseg = min(X.shape[-1], 256)
+    freqs, psd = welch(X, fs=sfreq, nperseg=nperseg, axis=-1)
+    mean_p = psd.mean(axis=(0, 1))
+    return [[float(f), float(p)] for f, p in zip(freqs, mean_p) if 1.0 <= f <= 45.0]
+
+
+def _connectivity(windows, y: int, ch_names: list[str]) -> list:
+    xs = [np.asarray(w["x"], dtype=float) for w in _windows_for_y(windows, y) if "x" in w]
+    if not xs:
+        return []
+    avg = np.mean([np.corrcoef(x) for x in xs], axis=0)
+    edges = []
+    n = min(len(ch_names), avg.shape[0])
+    for i in range(n):
+        for j in range(i + 1, n):
+            w = abs(float(avg[i, j]))
+            if w > 0.3:
+                edges.append([ch_names[i], ch_names[j], round(w, 3)])
+    return edges
+
+
+def hardware_viewer_payload(demo, meta, ablation) -> dict:
+    """Feed the 3D montage from GAP-Align demo windows. No CORAL / no reverse-direction SVM."""
+    names = list(demo.get("feature_names") or feature_names())
+    clinical = demo["clinical"]
+    wearable = demo["wearable"]
+    winner = ablation.get("winner", "C")
+    n_eegmat = int(meta.get("n_train_subjects") or 36)
+    n_stew = 48 if meta.get("target_source") == "stew" else n_eegmat
+    return {
+        "n_subjects": {"eegmat": n_eegmat, "stew": n_stew},
+        "overlap_channels": list(SHARED_CH),
+        "activity": {
+            "eegmat": {
+                "rest": _channel_activity(clinical, "features", 0, names),
+                "task": _channel_activity(clinical, "features", 1, names),
+            },
+            "stew": {
+                "rest": _channel_activity(wearable, "features_before", 0, names),
+                "task": _channel_activity(wearable, "features_before", 1, names),
+            },
+        },
+        "psd": {
+            "eegmat": {"rest": _psd_curve(clinical, 0), "task": _psd_curve(clinical, 1)},
+            "stew": {"rest": _psd_curve(wearable, 0), "task": _psd_curve(wearable, 1)},
+        },
+        "connectivity": {
+            "eegmat": {"rest": _connectivity(clinical, 0, SHARED_CH), "task": _connectivity(clinical, 1, SHARED_CH)},
+            "stew": {"rest": _connectivity(wearable, 0, SHARED_CH), "task": _connectivity(wearable, 1, SHARED_CH)},
+        },
+        "metrics": {
+            "accuracy_before": round(float(ablation["A"]["acc"]) * 100, 1),
+            "accuracy_after": round(float(ablation[winner]["acc"]) * 100, 1),
+        },
+    }
+
+
 def _pred_block(title: str, pred: int, proba, caption: str) -> None:
     p_load = float(proba[1])
     st.markdown(f"<div class='gap-kicker'>{title}</div>", unsafe_allow_html=True)
@@ -111,29 +203,35 @@ def page_live(demo, meta, ablation) -> None:
 
     subjects = sorted({w["subject"] for w in wearable})
     c_ctrl1, c_ctrl2, c_ctrl3 = st.columns([2, 2, 1])
-    with c_ctrl1:
-        sub = st.selectbox("Wearable subject", subjects, index=0)
-    windows = [w for w in wearable if w["subject"] == sub] or wearable
-    n_win = max(len(windows), 1)
-    if "w_idx" not in st.session_state:
-        st.session_state.w_idx = 0
-    st.session_state.w_idx = min(st.session_state.w_idx, n_win - 1)
     with c_ctrl3:
         play = st.toggle("Play", value=st.session_state.get("playing", False))
         st.session_state.playing = play
-    with c_ctrl2:
-        if play:
-            st.caption(f"Streaming window {st.session_state.get('w_idx', 0) + 1} / {n_win}")
-            idx = min(st.session_state.get("w_idx", 0), n_win - 1)
-        elif n_win <= 1:
-            st.caption("1 window for this subject")
-            idx = 0
-        else:
-            idx = st.slider("Window", 0, n_win - 1, st.session_state.get("w_idx", 0))
-            st.session_state.w_idx = idx
+    if "w_idx" not in st.session_state:
+        st.session_state.w_idx = 0
 
-    w = windows[idx]
-    c = clinical[idx % len(clinical)]
+    if play:
+        n_win = max(len(wearable), 1)
+        idx = st.session_state.w_idx % n_win
+        w = wearable[idx]
+        c = clinical[idx % len(clinical)]
+        with c_ctrl1:
+            st.caption(f"Streaming subject {w['subject']}")
+        with c_ctrl2:
+            st.caption(f"Window {idx + 1} / {n_win}")
+    else:
+        with c_ctrl1:
+            sub = st.selectbox("Wearable subject", subjects, index=0)
+        windows = [w for w in wearable if w["subject"] == sub] or wearable
+        n_win = max(len(windows), 1)
+        with c_ctrl2:
+            if n_win <= 1:
+                st.caption("One frozen snapshot for this subject — change subject or hit Play")
+                idx = 0
+            else:
+                idx = st.slider("Window", 0, n_win - 1, min(st.session_state.w_idx, n_win - 1))
+                st.session_state.w_idx = idx
+        w = windows[idx]
+        c = clinical[idx % len(clinical)]
     mode = st.radio("Wearable view", ["Before GAP-Align", "After GAP-Align"], horizontal=True)
 
     left, center, right = st.columns([1.15, 0.85, 1.15])
@@ -142,7 +240,7 @@ def page_live(demo, meta, ablation) -> None:
         st.plotly_chart(plot_traces(c["x"], SHARED_CH, title="2 s · 10 shared sites · 128 Hz"), use_container_width=True)
         st.plotly_chart(plot_bands(c["features"], names), use_container_width=True)
         _pred_block("Frozen model", c["pred"], c["proba"], "Hospital-grade stand-in · 19–23 ch wet · 500 Hz → aligned 10 ch 128 Hz")
-        st.caption(f"Subject {c['subject']} · true label: {_label(c['y'])}")
+        st.caption(f"Subject {c['subject']} · true label: {_label(c['y'])} · frozen 2 s snapshot, not a live headset")
 
     with right:
         st.subheader("Commercial · Emotiv / wearable")
@@ -168,19 +266,34 @@ def page_live(demo, meta, ablation) -> None:
         st.caption("True labels on the wearable are for scoring the dashboard, not for fitting z-score, EA, or the classifier.")
 
 
-def page_sim(demo, scaler, clf) -> None:
+def page_sim(demo, scaler, clf, meta, ablation) -> None:
     st.subheader("Hardware simulation")
     st.write(
-        "The cheap headset is not a smaller clinical headset. Green sites are the 10 channels the model sees. "
-        "Gold is P3 — Emotiv’s CMS. Grey sites are blind to the wearable model."
+        "The cheap headset is not a smaller clinical headset. Toggle **EEGMAT · 19ch** vs **STEW · 14ch**. "
+        "Shared 10–20 sites colour by band-power; grey nodes are dropped from the frozen model; gold is P3 (CMS)."
     )
-    c1, c2 = st.columns(2)
-    with c1:
-        st.plotly_chart(plot_scalp("neurocom"), use_container_width=True)
-        st.caption("Original linked-ear reference (A1+A2). We subtract P3 to imitate CMS, then drop P3.")
-    with c2:
-        st.plotly_chart(plot_scalp("epoc"), use_container_width=True)
-        st.caption("AF3 / AF4 / FC5 / FC6 are on the headset but not in the model. DRL at P4.")
+    st.caption(
+        "3D montage is the teammate hardware viewer (schematic 10–20, not a digitized head). "
+        "It is **not** the official transfer score. Do not quote CORAL/SVM from `main.py` — "
+        "that script trains STEW→EEGMAT, which is the wrong direction."
+    )
+    html_path = ROOT / "app" / "hardware_viewer.html"
+    html = html_path.read_text(encoding="utf-8")
+    payload = hardware_viewer_payload(demo, meta, ablation)
+    html = html.replace("/*__GAP_ALIGN_REAL__*/", f"window.GAP_ALIGN_REAL = {json.dumps(payload)};")
+    components.html(html, height=780, scrolling=True)
+
+    with st.expander("2D colour key (Guide Page 2)", expanded=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.plotly_chart(plot_scalp("neurocom"), use_container_width=True)
+            st.caption("Original linked-ear reference (A1+A2). We subtract P3 to imitate CMS, then drop P3.")
+        with c2:
+            st.plotly_chart(plot_scalp("epoc"), use_container_width=True)
+            st.caption("AF3 / AF4 / FC5 / FC6 are on the headset but not in the model. DRL at P4.")
+
+    st.markdown("**Degrade slider — this is the model-linked hardware sim**")
+    st.caption("Same frozen scaler/clf as Page 1. Slider uses `slider_degrade` / `fake_emotiv`.")
 
     if scaler is None or clf is None:
         st.warning("Frozen model artifacts missing — slider will not move P(load).")
@@ -216,6 +329,7 @@ def page_ablation(ablation, meta) -> None:
     with c2:
         winner = ablation["winner"]
         st.plotly_chart(plot_cm(ablation[winner]["cm"], f"After — pipeline {winner}"), use_container_width=True)
+    st.caption("These charts are the frozen official scores. They do not move while you click around Page 1.")
     st.info("Recovery must improve both classes. If F1 is far below accuracy, the adapter collapsed to the majority class.")
     if ablation.get("target_source") != "stew":
         st.warning("Target is not STEW. Do not put these numbers on a slide as EEGMAT→STEW.")
@@ -240,35 +354,6 @@ def page_ablation(ablation, meta) -> None:
     )
 
 
-def page_india() -> None:
-    st.subheader("Access, not a new EEG theory")
-    st.write(
-        "India cannot put a neurologist and an ₹8–40 lakh EEG cart in every district. "
-        "Fewer than 2,500 neurologists serve 1.4 billion people. Models get trained where the "
-        "machines and the labels live. GAP-Align is the calibration layer that lets a hospital-trained "
-        "model run on a headset a campus or clinic can actually buy."
-    )
-    st.markdown(
-        """
-        | Tier | Typical India kit | Ballpark |
-        |---|---|---|
-        | Imported hospital EEG | Nihon Kohden / Natus / Compumedics | ₹8–40 lakh+ |
-        | Indian clinical portable | RMS Maximus, Medicaid Neuromax | ₹1–5 lakh |
-        | Research wearable | Emotiv EPOC X 14-ch saline | ~₹70k–1.5 lakh |
-        | Wellness band | Muse / NeuroSky-class | ₹20–40k |
-        """
-    )
-    st.write(
-        "Neurocom vs Emotiv are **open-data proxies** for RMS-class hospital EEG vs a wearable India can deploy. "
-        "We did not record on RMS hardware in an Indian hospital."
-    )
-    st.error("Not a diagnostic EEG. Not CDSCO-cleared. Cognitive-load screening research tool only.")
-    st.write(
-        "Out of scope: seizure detection, stroke, dementia, replacing a neurologist, Ayushman billing. "
-        "Next validation is paired RMS + EPOC in one Indian lab, then a research Python module for college labs."
-    )
-
-
 def main() -> None:
     st.markdown("<div class='gap-kicker'>GAP-Align · Geometry And Physics Alignment</div>", unsafe_allow_html=True)
     st.title("Hospital EEG knowledge, unlocked for a wearable")
@@ -285,23 +370,20 @@ def main() -> None:
             "1 · Live compare",
             "2 · Hardware simulation",
             "3 · Ablation & trust",
-            "4 · India / access",
         ],
         index=0,
     )
     st.sidebar.markdown("---")
     st.sidebar.write("Direction is non-negotiable: **EEGMAT → STEW**. Classifier never sees wearable labels.")
+    st.sidebar.caption("Not a diagnostic EEG. Not CDSCO-cleared. Cognitive-load screening research tool.")
     st.sidebar.caption("Public de-identified research sets only. No patient data.")
 
-    if page.startswith("4"):
-        page_india()
-        return
     if demo is None or meta is None or ablation is None:
         _missing_box()
     if page.startswith("1"):
         page_live(demo, meta, ablation)
     elif page.startswith("2"):
-        page_sim(demo, scaler, clf)
+        page_sim(demo, scaler, clf, meta, ablation)
     else:
         page_ablation(ablation, meta)
 

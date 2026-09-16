@@ -34,11 +34,10 @@ python -m src.run_all
 streamlit run app/streamlit_app.py --server.port 8765
 ```
 
-Four dashboard pages:
+Three dashboard pages:
 
 1. Live compare — clinical window vs wearable, before/after GAP-Align
-2. Hardware simulation — Neurocom vs EPOC scalp maps + degrade slider
+2. Hardware simulation — teammate 3D montage + degrade slider on the frozen model
 3. Ablation & trust — pipelines A/C/D/E, confusion matrices
-4. India / access — price ladder and CDSCO disclaimer
 
 Not a diagnostic EEG. Not CDSCO-cleared. Cognitive-load screening research tool. Neurocom/Emotiv are open-data proxies for RMS-class hospital EEG vs a wearable a campus can buy.
