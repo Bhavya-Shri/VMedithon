@@ -212,8 +212,9 @@ def page_live(demo, meta, ablation) -> None:
     def _pair_label(i: int) -> str:
         ww = wearable[i]
         cc = clinical[i % len(clinical)]
+        tag = "REST · show collapse" if int(ww["y"]) == 0 else "LOAD · Before often already OK"
         return (
-            f"Slot {i + 1}/{n_pairs} · STEW {ww['subject']} {_label(ww['y'])}  ·  "
+            f"Slot {i + 1}/{n_pairs} · {tag} · STEW {ww['subject']} {_label(ww['y'])}  ·  "
             f"EEGMAT {cc['subject']} {_label(cc['y'])}"
         )
 
@@ -250,11 +251,24 @@ def page_live(demo, meta, ablation) -> None:
     chart_key = f"p{pack_i}_{'a' if show_after else 'b'}"
     ok_b = int(w["pred_before"]) == int(w["y"])
     ok_a = int(w["pred_after"]) == int(w["y"])
-    st.info(
-        "GAP-Align does **not** copy the EEGMAT traces. After should match the **STEW eval label** "
-        "(right column), not the hospital person on the left. Before often *looks* like clinical "
-        "`P(load)` because both collapsed to load."
-    )
+    stew_load = int(w["y"]) == 1
+    recovered = (not ok_b) and ok_a
+    if stew_load:
+        st.info(
+            "This is a **load** slot. Before is often already correct (the naive port loves to say load). "
+            "After staying on load is success. It does **not** need to match EEGMAT P=0.99. "
+            "Open slots **1–5 (REST)** to see the collapse: Before wrongly says load, After says rest."
+        )
+    elif recovered:
+        st.success(
+            "This is the demo: STEW rest, Before collapsed to **load**, After recovered **rest**. "
+            "Do not compare After to the EEGMAT `P(load)` on the left — different person."
+        )
+    else:
+        st.info(
+            "STEW **rest** slot. Watch the right-hand label vs STEW rest, not vs the hospital traces. "
+            "After bars use a different scale (z-scored EEG)."
+        )
 
     left, center, right = st.columns([1.15, 0.85, 1.15])
     with left:
@@ -298,17 +312,12 @@ def page_live(demo, meta, ablation) -> None:
             key=f"wear_bp_{chart_key}",
         )
         m1, m2 = st.columns(2)
-        m1.metric(
-            "P(load) before",
-            f"{float(w['proba_before'][1]):.2f}",
-            delta="correct" if ok_b else "wrong vs STEW",
-            delta_color="normal" if ok_b else "inverse",
-        )
-        m2.metric(
-            "P(load) after",
-            f"{float(w['proba_after'][1]):.2f}",
-            delta="correct" if ok_a else "wrong vs STEW",
-            delta_color="normal" if ok_a else "inverse",
+        m1.metric("P(load) before", f"{float(w['proba_before'][1]):.2f}")
+        m2.metric("P(load) after", f"{float(w['proba_after'][1]):.2f}")
+        st.caption(
+            f"Vs STEW {_label(w['y'])}: before {'correct' if ok_b else 'WRONG'} · "
+            f"after {'correct' if ok_a else 'WRONG'}"
+            + (" · recovered" if recovered else "")
         )
         if show_after:
             _pred_block(
