@@ -64,12 +64,7 @@ def plot_traces(x, ch=None, sfreq: float = 128.0, title: str = "") -> go.Figure:
     return fig
 
 
-def plot_bands(
-    features,
-    names,
-    title: str = "θ / α / β log band-power",
-    yaxis_title: str = "log10 PSD",
-) -> go.Figure:
+def plot_bands(features, names, title: str = "θ / α / β log band-power") -> go.Figure:
     features = np.asarray(features, dtype=float)
     bands = ["theta", "alpha", "beta"]
     colors = {"theta": "#7db7ff", "alpha": "#3dd6c6", "beta": "#e4b84a"}
@@ -90,7 +85,7 @@ def plot_bands(
         title=title,
         barmode="group",
         height=260,
-        yaxis_title=yaxis_title,
+        yaxis_title="log10 PSD",
         legend=dict(bgcolor="rgba(0,0,0,0)", orientation="h", y=1.12),
     )
     return fig
