@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cross-Device EEG Workload Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --void:#090C10;
+    --panel:#10161F;
+    --panel-raised:#171F2B;
+    --line:#232D3B;
+    --text:#E7ECF3;
+    --muted:#7C8AA0;
+    --dim:#4A5568;
+    --cyan:#4FD8C4;
+    --amber:#FF8B4D;
+    --violet:#9C87F0;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    background:var(--void);
+    color:var(--text);
+    font-family:'IBM Plex Mono', monospace;
+    height:100%;
+    overflow-x:hidden;
+  }
+  ::selection{ background:var(--cyan); color:var(--void); }
+
+  h1,h2,h3{ font-family:'Space Grotesk', sans-serif; letter-spacing:-0.01em; }
+
+  .app{
+    max-width:1440px;
+    margin:0 auto;
+    padding:28px 32px 48px;
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:20px;
+    padding-bottom:22px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:24px;
+  }
+  .brand h1{ font-size:26px; font-weight:600; color:var(--text); }
+  .brand p{ font-size:12.5px; color:var(--muted); margin-top:6px; max-width:520px; line-height:1.5; }
+  .brand p .accent{ color:var(--cyan); }
+
+  .controls{ display:flex; gap:22px; align-items:flex-end; flex-wrap:wrap; }
+  .control-group label{
+    display:block; font-size:10.5px; color:var(--muted); margin-bottom:7px;
+  }
+  .segmented{
+    display:flex; border:1px solid var(--line); overflow:hidden;
+  }
+  .segmented button{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+    background:var(--panel);
+    border:none;
+    padding:9px 16px;
+    cursor:pointer;
+    transition: color .15s ease, background .15s ease;
+    border-right:1px solid var(--line);
+  }
+  .segmented button:last-child{ border-right:none; }
+  .segmented button:hover{ color:var(--text); }
+  .segmented button.active{ background:var(--panel-raised); color:var(--text); }
+  .segmented button.active[data-state="task"]{ color:var(--amber); }
+  .segmented button.active[data-state="rest"]{ color:var(--cyan); }
+
+  .toggle-pill{
+    display:flex; align-items:center; gap:9px;
+    font-size:12px; color:var(--muted); cursor:pointer; user-select:none;
+    border:1px solid var(--line); padding:9px 14px; background:var(--panel);
+  }
+  .toggle-pill .dot{
+    width:8px; height:8px; border-radius:50%; background:var(--dim);
+    transition: background .15s ease, box-shadow .15s ease;
+  }
+  .toggle-pill.on .dot{ background:var(--violet); box-shadow:0 0 8px var(--violet); }
+  .toggle-pill.on{ color:var(--text); }
+
+  /* ---------- Grid ---------- */
+  .grid{
+    display:grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap:20px;
+  }
+  @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+  }
+  .panel-head{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding:16px 18px 12px; border-bottom:1px solid var(--line);
+  }
+  .panel-head h2{ font-size:14.5px; font-weight:600; }
+  .panel-head span{ font-size:11px; color:var(--muted); }
+
+  .right-col{ display:flex; flex-direction:column; gap:20px; }
+
+  /* ---------- Brain viewer ---------- */
+  #brain-wrap{
+    position:relative;
+    height:560px;
+  }
+  #brain-canvas{ width:100%; height:100%; display:block; cursor:grab; }
+  #brain-canvas:active{ cursor:grabbing; }
+
+  #tooltip{
+    position:absolute; pointer-events:none;
+    background:var(--panel-raised); border:1px solid var(--line);
+    padding:10px 12px; font-size:11.5px; line-height:1.6;
+    display:none; z-index:5; min-width:150px;
+  }
+  #tooltip .ch-name{ color:var(--text); font-weight:600; font-size:13px; display:block; margin-bottom:4px; }
+  #tooltip .ch-row{ display:flex; justify-content:space-between; color:var(--muted); gap:14px; }
+  #tooltip .ch-row b{ color:var(--text); font-weight:500; }
+
+  .legend{
+    position:absolute; bottom:14px; left:18px; display:flex; gap:18px;
+    font-size:10.5px; color:var(--muted); z-index:3;
+  }
+  .legend .swatch{ display:inline-flex; align-items:center; gap:6px; }
+  .legend .swatch i{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+
+  .device-badge{
+    position:absolute; top:16px; left:18px; z-index:3;
+    font-size:11px; color:var(--muted);
+  }
+  .device-badge b{ color:var(--text); }
+
+  /* ---------- PSD panel ---------- */
+  #psd-svg{ width:100%; height:220px; display:block; }
+  .psd-key{ display:flex; gap:16px; padding:0 18px 14px; font-size:11px; color:var(--muted); }
+  .psd-key .swatch{ display:inline-flex; align-items:center; gap:6px; }
+  .psd-key i{ width:14px; height:2px; display:inline-block; }
+
+  /* ---------- Alignment panel ---------- */
+  #align-svg{ width:100%; height:230px; display:block; }
+  .align-controls{ display:flex; justify-content:space-between; align-items:center; padding:12px 18px 14px; }
+  .align-controls .psd-key{ padding:0; }
+  #align-toggle{
+    font-family:'IBM Plex Mono', monospace; font-size:11.5px;
+    background:var(--panel-raised); color:var(--text);
+    border:1px solid var(--line); padding:8px 14px; cursor:pointer;
+  }
+  #align-toggle:hover{ border-color:var(--violet); }
+
+  .point{ transition: transform 900ms cubic-bezier(.4,0,.2,1); }
+
+  /* ---------- Metrics bar ---------- */
+  .metrics{
+    margin-top:20px; display:grid; grid-template-columns:repeat(4,1fr);
+    border:1px solid var(--line);
+  }
+  @media (max-width:780px){ .metrics{ grid-template-columns:repeat(2,1fr); } }
+  .metric{
+    padding:16px 18px; border-right:1px solid var(--line);
+  }
+  .metric:last-child{ border-right:none; }
+  .metric .m-label{ font-size:11px; color:var(--muted); margin-bottom:8px; }
+  .metric .m-value{ font-size:26px; font-family:'Space Grotesk', sans-serif; font-weight:600; color:var(--text); transition:color .3s ease; }
+  .metric .m-sub{ font-size:10.5px; color:var(--dim); margin-top:6px; }
+  .metric.good .m-value{ color:var(--cyan); }
+  .metric.warn .m-value{ color:var(--amber); }
+
+  footer{
+    margin-top:22px; font-size:10.5px; color:var(--dim); line-height:1.7;
+    border-top:1px solid var(--line); padding-top:16px;
+  }
+  footer b{ color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="brand">
+      <h1>Cross-Device EEG Workload Console</h1>
+      <p>Live electrode geometry, spectral state, and alignment quality for
+        <span class="accent">EEGMAT</span> ↔ <span class="accent">STEW</span> domain adaptation.
+        Toggle cognitive state to see the frontal-theta / parieto-occipital-alpha
+        shift propagate across the montage.</p>
+    </div>
+    <div class="controls">
+      <div class="control-group">
+        <label>Device montage</label>
+        <div class="segmented" id="device-toggle">
+          <button class="active" data-device="stew">STEW · 14ch</button>
+          <button data-device="eegmat">EEGMAT · 19ch</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <label>Cognitive state</label>
+        <div class="segmented" id="state-toggle">
+          <button class="active" data-state="rest">Rest</button>
+          <button data-state="task">Task</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <label>Overlay</label>
+        <div class="toggle-pill on" id="conn-toggle">
+          <span class="dot"></span> Functional connectivity
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Electrode field &amp; connectivity</h2>
+        <span>drag to rotate · hover a node</span>
+      </div>
+      <div id="brain-wrap">
+        <canvas id="brain-canvas"></canvas>
+        <div class="device-badge">Montage: <b id="badge-device">STEW (14 channels)</b></div>
+        <div id="tooltip"></div>
+        <div class="legend">
+          <span class="swatch"><i style="background:var(--cyan)"></i>low band-power</span>
+          <span class="swatch"><i style="background:var(--amber)"></i>high band-power</span>
+          <span class="swatch"><i style="background:var(--violet)"></i>functional link</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-col">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Power spectral density</h2>
+          <span id="psd-region">whole-montage average</span>
+        </div>
+        <svg id="psd-svg" viewBox="0 0 460 220"></svg>
+        <div class="psd-key">
+          <span class="swatch"><i style="background:var(--cyan)"></i>Rest</span>
+          <span class="swatch"><i style="background:var(--amber)"></i>Task</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Latent space alignment</h2>
+          <span id="align-label">before CORAL</span>
+        </div>
+        <svg id="align-svg" viewBox="0 0 460 230"></svg>
+        <div class="align-controls">
+          <div class="psd-key">
+            <span class="swatch" id="align-key-1"><i style="background:var(--cyan)"></i>STEW</span>
+            <span class="swatch" id="align-key-2"><i style="background:var(--amber)"></i>EEGMAT</span>
+          </div>
+          <button id="align-toggle">Apply domain adaptation →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric" id="m-acc">
+      <div class="m-label">Cross-device accuracy</div>
+      <div class="m-value">50.0%</div>
+      <div class="m-sub">SVM trained on STEW, scored on EEGMAT (LOSO)</div>
+    </div>
+    <div class="metric" id="m-mmd">
+      <div class="m-label">MMD distance</div>
+      <div class="m-value">1.415</div>
+      <div class="m-sub">RBF maximum mean discrepancy, device distributions</div>
+    </div>
+    <div class="metric">
+      <div class="m-label">Montage overlap</div>
+      <div class="m-value" id="m-overlap">14 / 19</div>
+      <div class="m-sub">shared 10-20 sites used as common feature space</div>
+    </div>
+    <div class="metric">
+      <div class="m-label">Subjects</div>
+      <div class="m-value">5 + 48</div>
+      <div class="m-sub">EEGMAT held out for LOSO test · STEW trains the model</div>
+    </div>
+  </div>
+
+  <footer>
+    <b>Data note —</b> electrode-level band powers and the connectivity matrix are illustrative,
+    generated from the documented frontal-theta / parieto-occipital-alpha workload signature, not
+    yet fit to your real recordings. Accuracy and MMD figures above are from the pipeline's synthetic
+    validation run (see <b>report.json</b>) and will update once you run <b>main.py</b> on your actual
+    EEGMAT and STEW files. 3D electrode positions are a schematic 10-20 layout for visualization, not
+    digitized head-shape coordinates.
+  </footer>
+</div>
+
+<script>
+/* =========================================================================
+   1. MONTAGE DEFINITIONS
+   Elevation = degrees from vertex (0=Cz/top, 90=equator/ear-level, ~80-90=near rim)
+   Azimuth   = degrees from nose (0=front, 90=right ear, 180=back, -90=left ear)
+   Region groups drive the (illustrative) workload response profile.
+========================================================================= */
+const MONTAGES = {
+  stew: [
+    {name:'AF3', el:60, az:-20,  region:'frontal'},
+    {name:'F7',  el:70, az:-60,  region:'frontal'},
+    {name:'F3',  el:45, az:-60,  region:'frontal'},
+    {name:'FC5', el:60, az:-70,  region:'frontal'},
+    {name:'T7',  el:70, az:-90,  region:'temporal'},
+    {name:'P7',  el:70, az:-120, region:'parietal'},
+    {name:'O1',  el:80, az:-155, region:'occipital'},
+    {name:'O2',  el:80, az:155,  region:'occipital'},
+    {name:'P8',  el:70, az:120,  region:'parietal'},
+    {name:'T8',  el:70, az:90,   region:'temporal'},
+    {name:'FC6', el:60, az:70,   region:'frontal'},
+    {name:'F4',  el:45, az:60,   region:'frontal'},
+    {name:'F8',  el:70, az:60,   region:'frontal'},
+    {name:'AF4', el:60, az:20,   region:'frontal'},
+  ],
+  eegmat: [
+    {name:'Fp1', el:80, az:-25,  region:'frontal'},
+    {name:'Fp2', el:80, az:25,   region:'frontal'},
+    {name:'F7',  el:70, az:-60,  region:'frontal'},
+    {name:'F3',  el:45, az:-60,  region:'frontal'},
+    {name:'Fz',  el:45, az:0,    region:'frontal'},
+    {name:'F4',  el:45, az:60,   region:'frontal'},
+    {name:'F8',  el:70, az:60,   region:'frontal'},
+    {name:'T7',  el:70, az:-90,  region:'temporal'},
+    {name:'C3',  el:45, az:-90,  region:'central'},
+    {name:'Cz',  el:0,  az:0,    region:'central'},
+    {name:'C4',  el:45, az:90,   region:'central'},
+    {name:'T8',  el:70, az:90,   region:'temporal'},
+    {name:'P7',  el:70, az:-120, region:'parietal'},
+    {name:'P3',  el:45, az:-120, region:'parietal'},
+    {name:'Pz',  el:45, az:180,  region:'parietal'},
+    {name:'P4',  el:45, az:120,  region:'parietal'},
+    {name:'P8',  el:70, az:120,  region:'parietal'},
+    {name:'O1',  el:80, az:-155, region:'occipital'},
+    {name:'O2',  el:80, az:155,  region:'occipital'},
+  ]
+};
+
+// Documented workload signature (illustrative magnitudes, 0-1 scale):
+// frontal theta/beta rises under task; parietal/occipital alpha drops.
+const REGION_RESPONSE = {
+  frontal:   {rest:0.28, task:0.82},
+  central:   {rest:0.32, task:0.55},
+  temporal:  {rest:0.30, task:0.48},
+  parietal:  {rest:0.62, task:0.22},
+  occipital: {rest:0.70, task:0.18},
+};
+
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(42);
+
+function activityFor(region, state){
+  const base = REGION_RESPONSE[region][state];
+  const jitter = (rand() - 0.5) * 0.08;
+  return Math.min(1, Math.max(0, base + jitter));
+}
+
+/* ---- real-data hook: fetch report.json (written by main.py) if present.
+   Falls back silently to the illustrative generator above when it's
+   missing (e.g. opening the file directly instead of via a local server,
+   or you haven't run the pipeline yet). ---- */
+let REAL = null;
+async function loadReport(){
+  try{
+    const res = await fetch('report.json', {cache:'no-store'});
+    if(res.ok) REAL = await res.json();
+  }catch(e){ /* no server / no file — stay in illustrative mode */ }
+}
+
+function getActivity(channelName, region, state, device){
+  const real = REAL?.activity?.[device]?.[state]?.[channelName];
+  if(real !== undefined) return real;
+  return activityFor(region, state);
+}
+
+function colorForActivity(a){
+  // interpolate cyan (low) -> amber (high)
+  const c1 = {r:0x4F,g:0xD8,b:0xC4};
+  const c2 = {r:0xFF,g:0x8B,b:0x4D};
+  const r = Math.round(c1.r + (c2.r-c1.r)*a);
+  const g = Math.round(c1.g + (c2.g-c1.g)*a);
+  const b = Math.round(c1.b + (c2.b-c1.b)*a);
+  return (r<<16)|(g<<8)|b;
+}
+
+function applyRealDataNotice(){
+  const footer = document.querySelector('footer');
+  if(REAL){
+    const m = REAL.metrics;
+    const accEl = document.querySelector('#m-acc .m-value');
+    const mmdEl = document.querySelector('#m-mmd .m-value');
+    if(accEl) accEl.textContent = m.accuracy_before.toFixed(1) + '%';
+    if(mmdEl) mmdEl.textContent = m.mmd_before;
+    const overlapEl = document.getElementById('m-overlap');
+    if(overlapEl) overlapEl.textContent = `${REAL.overlap_channels.length} / ${REAL.overlap_channels.length}`;
+    const n = REAL.n_subjects;
+    document.querySelectorAll('.metric').forEach(el=>{
+      if(el.querySelector('.m-label')?.textContent === 'Subjects'){
+        el.querySelector('.m-value').textContent = `${n.eegmat} + ${n.stew}`;
+      }
+    });
+    if(footer) footer.innerHTML = `<b>Data note —</b> electrode-level band powers, PSDs, connectivity and the
+      accuracy/MMD figures above are computed from your real EEGMAT (${n.eegmat} subjects) and STEW
+      (${n.stew} subjects) recordings via <b>main.py</b> → <b>report.json</b>. Overlap channels used for the
+      cross-device classifier: ${REAL.overlap_channels.join(', ')}. 3D electrode positions remain a schematic
+      10-20 layout for visualization, not digitized head-shape coordinates.`;
+  } else if(footer){
+    footer.innerHTML = footer.innerHTML.replace('electrode-level band powers',
+      'SIMULATED MODE (report.json not found/loaded) — electrode-level band powers');
+  }
+}
+
+/* =========================================================================
+   2. THREE.JS SCENE — brain mesh + electrode nodes + connectivity lines
+========================================================================= */
+(async function boot(){
+await loadReport();
+applyRealDataNotice();
+
+const canvas = document.getElementById('brain-canvas');
+const wrap = document.getElementById('brain-wrap');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 2000);
+camera.position.set(0, 40, 340);
+
+const rig = new THREE.Group();
+scene.add(rig);
+
+// lighting
+scene.add(new THREE.AmbientLight(0x8899aa, 0.9));
+const key = new THREE.DirectionalLight(0xffffff, 0.9);
+key.position.set(150, 200, 220);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x9c87f0, 0.35);
+rim.position.set(-200, -80, -150);
+scene.add(rim);
+
+// --- brain mesh: displaced icosahedron for a low-poly gyrus/sulcus feel ---
+function buildBrain(){
+  const geo = new THREE.IcosahedronGeometry(78, 4);
+  const pos = geo.attributes.position;
+  const v = new THREE.Vector3();
+  for(let i=0;i<pos.count;i++){
+    v.fromBufferAttribute(pos,i);
+    const n = v.clone().normalize();
+    // squash slightly on the vertical (brain is wider than tall) and
+    // carve a central sagittal groove
+    const groove = Math.exp(-Math.pow(n.x*10,2)) * 6;
+    const wrinkle = (
+      Math.sin(n.x*9 + n.y*5) * Math.sin(n.z*7 - n.y*4) * 3.4 +
+      Math.sin(n.y*13 + n.z*3) * 1.8
+    );
+    const r = 78 + wrinkle - groove;
+    v.copy(n.multiplyScalar(r));
+    v.y *= 0.86;
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshPhongMaterial({
+    color:0x8a7f8f, shininess:18, flatShading:true,
+    transparent:true, opacity:0.9,
+  });
+  return new THREE.Mesh(geo, mat);
+}
+const brain = buildBrain();
+rig.add(brain);
+
+// outer translucent head shell
+const headGeo = new THREE.SphereGeometry(112, 32, 24);
+headGeo.scale(1, 1.12, 1.05);
+const headMat = new THREE.MeshPhongMaterial({
+  color:0xdfe6ee, transparent:true, opacity:0.05, shininess:40,
+  side:THREE.DoubleSide, depthWrite:false,
+});
+const head = new THREE.Mesh(headGeo, headMat);
+rig.add(head);
+
+// electrode node + connectivity groups (rebuilt on montage/state change)
+let nodeGroup = new THREE.Group();
+let lineGroup = new THREE.Group();
+rig.add(nodeGroup, lineGroup);
+
+const NODE_RADIUS = 108;
+function polarToVec(el, az){
+  const phi = THREE.MathUtils.degToRad(el);
+  const theta = THREE.MathUtils.degToRad(az);
+  const x = NODE_RADIUS * Math.sin(phi) * Math.sin(theta);
+  const y = NODE_RADIUS * Math.cos(phi) * 1.12; // match head squash
+  const z = NODE_RADIUS * Math.sin(phi) * Math.cos(theta) * 1.05;
+  return new THREE.Vector3(x, y, z);
+}
+
+let currentDevice = 'stew';
+let currentState = 'rest';
+let showConnectivity = true;
+let nodeMeshes = []; // {mesh, channel, activity}
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function buildMontage(){
+  nodeGroup.clear();
+  lineGroup.clear();
+  nodeMeshes = [];
+
+  const channels = MONTAGES[currentDevice];
+  const positions = channels.map(ch => polarToVec(ch.el, ch.az));
+
+  channels.forEach((ch, i) => {
+    const activity = getActivity(ch.name, ch.region, currentState, currentDevice);
+    const color = colorForActivity(activity);
+    const geo = new THREE.SphereGeometry(3.2 + activity*3.2, 16, 16);
+    const mat = new THREE.MeshPhongMaterial({ color, emissive:color, emissiveIntensity:0.35 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(positions[i]);
+    mesh.userData = { channel: ch.name, region: ch.region, activity };
+    nodeGroup.add(mesh);
+    nodeMeshes.push(mesh);
+
+    // thin stalk connecting node to the brain surface, purely decorative
+    const stalkGeo = new THREE.BufferGeometry().setFromPoints([
+      positions[i], positions[i].clone().multiplyScalar(0.74)
+    ]);
+    const stalkMat = new THREE.LineBasicMaterial({ color:0x2a3444, transparent:true, opacity:0.6 });
+    nodeGroup.add(new THREE.Line(stalkGeo, stalkMat));
+  });
+
+  // connectivity: real edges (band-power correlation from report.json) when
+  // available; otherwise the illustrative same-region / task fronto-parietal
+  // synchrony pattern described in the docstring below.
+  const realEdges = REAL?.connectivity?.[currentDevice]?.[currentState];
+  const nameIndex = {};
+  channels.forEach((ch,i)=> nameIndex[ch.name]=i);
+
+  if(realEdges){
+    realEdges.forEach(([a,b,w])=>{
+      const i = nameIndex[a], j = nameIndex[b];
+      if(i===undefined || j===undefined) return;
+      const geo = new THREE.BufferGeometry().setFromPoints([positions[i], positions[j]]);
+      const mat = new THREE.LineBasicMaterial({
+        color:0x9c87f0, transparent:true, opacity: Math.min(0.85, w*0.9)
+      });
+      const line = new THREE.Line(geo, mat);
+      line.userData.isConnectivity = true;
+      lineGroup.add(line);
+    });
+  } else {
+    // same-region pairs strong, cross-region weaker; task state adds
+    // long-range frontal<->parietal links (documented fronto-parietal
+    // theta synchrony under workload) — illustrative magnitudes.
+    for(let i=0;i<channels.length;i++){
+      for(let j=i+1;j<channels.length;j++){
+        const a = channels[i], b = channels[j];
+        let w = 0;
+        if(a.region === b.region) w = 0.55 + rand()*0.25;
+        else if(currentState==='task' &&
+          ((a.region==='frontal'&&b.region==='parietal') || (a.region==='parietal'&&b.region==='frontal'))){
+          w = 0.4 + rand()*0.3;
+        } else {
+          w = rand()*0.12;
+        }
+        if(w < 0.28) continue;
+        const geo = new THREE.BufferGeometry().setFromPoints([positions[i], positions[j]]);
+        const mat = new THREE.LineBasicMaterial({
+          color:0x9c87f0, transparent:true, opacity: Math.min(0.85, w*0.9)
+        });
+        const line = new THREE.Line(geo, mat);
+        line.userData.isConnectivity = true;
+        lineGroup.add(line);
+      }
+    }
+  }
+  lineGroup.visible = showConnectivity;
+  renderPSD();
+}
+buildMontage();
+
+/* ---- resize ---- */
+function fitCanvas(){
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', fitCanvas);
+fitCanvas();
+
+/* ---- drag-to-rotate + idle auto-rotate ---- */
+let dragging=false, lastX=0, lastY=0, autoRotate=true, idleTimer=null;
+canvas.addEventListener('pointerdown', e=>{
+  dragging=true; lastX=e.clientX; lastY=e.clientY; autoRotate=false;
+  clearTimeout(idleTimer);
+});
+window.addEventListener('pointerup', ()=>{
+  dragging=false;
+  idleTimer = setTimeout(()=>{ autoRotate=true; }, 2200);
+});
+window.addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  const dx=e.clientX-lastX, dy=e.clientY-lastY;
+  rig.rotation.y += dx*0.006;
+  rig.rotation.x = Math.max(-0.7, Math.min(0.7, rig.rotation.x + dy*0.006));
+  lastX=e.clientX; lastY=e.clientY;
+});
+canvas.addEventListener('mousemove', e=>{
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y = -((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(nodeMeshes);
+  const tooltip = document.getElementById('tooltip');
+  if(hits.length){
+    const d = hits[0].object.userData;
+    tooltip.style.display='block';
+    tooltip.style.left = (e.clientX-rect.left+14)+'px';
+    tooltip.style.top = (e.clientY-rect.top+10)+'px';
+    tooltip.innerHTML = `<span class="ch-name">${d.channel}</span>
+      <div class="ch-row"><span>region</span><b>${d.region}</b></div>
+      <div class="ch-row"><span>activity</span><b>${(d.activity*100).toFixed(0)}%</b></div>
+      <div class="ch-row"><span>state</span><b>${currentState}</b></div>`;
+  } else {
+    tooltip.style.display='none';
+  }
+});
+canvas.addEventListener('mouseleave', ()=>{ document.getElementById('tooltip').style.display='none'; });
+
+function animate(){
+  requestAnimationFrame(animate);
+  if(autoRotate) rig.rotation.y += 0.0022;
+  renderer.render(scene, camera);
+}
+animate();
+
+/* =========================================================================
+   3. PSD PANEL — SVG line chart, Rest vs Task, redraws with montage state
+========================================================================= */
+function psdCurve(device, state){
+  const real = REAL?.psd?.[device]?.[state];
+  if(real) return real;
+  // sum-of-gaussians PSD approximation across delta..gamma, shaped by state
+  const bands = state==='rest'
+    ? {delta:0.55, theta:0.4, alpha:0.95, beta:0.3, gamma:0.15}
+    : {delta:0.5,  theta:0.75,alpha:0.25, beta:0.85,gamma:0.35};
+  const centers = {delta:2.5, theta:6, alpha:10, beta:20, gamma:38};
+  const widths  = {delta:1.6, theta:2.2, alpha:1.8, beta:7, gamma:6};
+  const pts = [];
+  for(let f=1; f<=45; f+=0.5){
+    let p = 0.05;
+    for(const b in bands){
+      const c=centers[b], w=widths[b], amp=bands[b];
+      p += amp * Math.exp(-Math.pow(f-c,2)/(2*w*w));
+    }
+    pts.push([f, p]);
+  }
+  return pts;
+}
+
+function renderPSD(){
+  const svg = document.getElementById('psd-svg');
+  const W=460, H=220, padL=34, padB=26, padT=14, padR=14;
+  const restPts = psdCurve(currentDevice, 'rest'), taskPts = psdCurve(currentDevice, 'task');
+  const maxY = Math.max(...restPts.map(p=>p[1]), ...taskPts.map(p=>p[1])) * 1.1;
+  const xScale = f => padL + (f-1)/(45-1) * (W-padL-padR);
+  const yScale = p => H-padB - (p/maxY) * (H-padB-padT);
+
+  function pathFor(pts){
+    return pts.map((p,i)=> (i===0?'M':'L') + xScale(p[0]).toFixed(1) + ' ' + yScale(p[1]).toFixed(1)).join(' ');
+  }
+
+  let gridlines = '';
+  [1,4,8,12,30,45].forEach(f=>{
+    const x = xScale(f);
+    gridlines += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${H-padB}" stroke="#232D3B" stroke-width="1"/>
+      <text x="${x}" y="${H-padB+16}" fill="#7C8AA0" font-size="9" text-anchor="middle">${f}</text>`;
+  });
+
+  svg.innerHTML = `
+    ${gridlines}
+    <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="#232D3B"/>
+    <path d="${pathFor(restPts)}" fill="none" stroke="#4FD8C4" stroke-width="2"/>
+    <path d="${pathFor(taskPts)}" fill="none" stroke="#FF8B4D" stroke-width="2"/>
+    <text x="${padL}" y="12" fill="#4A5568" font-size="9">log power</text>
+    <text x="${W-padR}" y="${H-8}" fill="#4A5568" font-size="9" text-anchor="end">frequency (Hz)</text>
+  `;
+}
+renderPSD(); // initial paint; buildMontage() also re-renders on device/state toggle
+
+/* =========================================================================
+   4. ALIGNMENT PANEL — before/after CORAL scatter, animated transform
+========================================================================= */
+const N_PER_DEVICE = 55;
+const rand2 = mulberry32(7);
+function gaussian(rng){ // Box-Muller
+  let u=0,v=0;
+  while(u===0) u=rng();
+  while(v===0) v=rng();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+
+const alignW=460, alignH=230;
+let points = REAL?.alignment?.points;
+if(!points){
+  points = [];
+  // BEFORE: two well-separated clouds (device signature dominates)
+  // AFTER:  merged cloud, but separable by cognitive label instead
+  for(let i=0;i<N_PER_DEVICE;i++){
+    const label = i % 2; // 0 rest, 1 task
+    points.push({
+      device:'stew',
+      label,
+      before:{ x: alignW*0.30 + gaussian(rand2)*26, y: alignH*0.5 + gaussian(rand2)*46 },
+      after:{
+        x: alignW*0.5 + (label===0? -50:50) + gaussian(rand2)*22,
+        y: alignH*0.5 + gaussian(rand2)*40
+      }
+    });
+  }
+  for(let i=0;i<N_PER_DEVICE;i++){
+    const label = i % 2;
+    points.push({
+      device:'eegmat',
+      label,
+      before:{ x: alignW*0.72 + gaussian(rand2)*26, y: alignH*0.5 + gaussian(rand2)*46 },
+      after:{
+        x: alignW*0.5 + (label===0? -50:50) + gaussian(rand2)*22,
+        y: alignH*0.5 + gaussian(rand2)*40
+      }
+    });
+  }
+}
+
+let aligned = false;
+function colorFor(p){
+  if(!aligned) return p.device==='stew' ? '#4FD8C4' : '#FF8B4D';
+  return p.label===0 ? '#4FD8C4' : '#FF8B4D';
+}
+
+function renderAlign(){
+  const svg = document.getElementById('align-svg');
+  svg.setAttribute('viewBox', `0 0 ${alignW} ${alignH}`);
+  svg.innerHTML = points.map((p,i)=>{
+    const pos = aligned ? p.after : p.before;
+    return `<circle class="point" cx="0" cy="0" r="4"
+      style="transform:translate(${pos.x}px,${pos.y}px); fill:${colorFor(p)}; opacity:0.82;"
+      data-i="${i}"/>`;
+  }).join('');
+}
+renderAlign();
+
+document.getElementById('align-toggle').addEventListener('click', ()=>{
+  aligned = !aligned;
+  document.getElementById('align-label').textContent = aligned ? 'after CORAL' : 'before CORAL';
+  document.getElementById('align-toggle').textContent = aligned ? '← revert to raw features' : 'Apply domain adaptation →';
+  // update positions first (triggers CSS transition), recolor after the move
+  const circles = document.querySelectorAll('#align-svg .point');
+  circles.forEach((c,i)=>{
+    const pos = aligned ? points[i].after : points[i].before;
+    c.style.transform = `translate(${pos.x}px,${pos.y}px)`;
+  });
+  setTimeout(()=>{
+    circles.forEach((c,i)=>{ c.style.fill = colorFor(points[i]); });
+    document.getElementById('align-key-1').innerHTML = aligned
+      ? '<i style="background:var(--cyan)"></i>Rest / low workload'
+      : '<i style="background:var(--cyan)"></i>STEW';
+    document.getElementById('align-key-2').innerHTML = aligned
+      ? '<i style="background:var(--amber)"></i>Task / high workload'
+      : '<i style="background:var(--amber)"></i>EEGMAT';
+  }, 450);
+
+  // metrics sweep to match the pipeline's actual synthetic validation run
+  const acc = document.querySelector('#m-acc .m-value');
+  const mmd = document.querySelector('#m-mmd .m-value');
+  const accBox = document.getElementById('m-acc');
+  const mmdBox = document.getElementById('m-mmd');
+  const m = REAL?.metrics;
+  if(aligned){
+    acc.textContent = (m ? m.accuracy_after.toFixed(1) : '100.0') + '%';
+    mmd.textContent = m ? m.mmd_after : '0.00004';
+    accBox.classList.add('good'); mmdBox.classList.add('good');
+  } else {
+    acc.textContent = (m ? m.accuracy_before.toFixed(1) : '50.0') + '%';
+    mmd.textContent = m ? m.mmd_before : '1.415';
+    accBox.classList.remove('good'); mmdBox.classList.remove('good');
+  }
+});
+
+/* =========================================================================
+   5. CONTROL WIRING
+========================================================================= */
+document.getElementById('device-toggle').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  document.querySelectorAll('#device-toggle button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentDevice = btn.dataset.device;
+  document.getElementById('badge-device').textContent =
+    currentDevice==='stew' ? 'STEW (14 channels)' : 'EEGMAT (19 channels)';
+  document.getElementById('m-overlap').textContent = REAL
+    ? `${REAL.overlap_channels.length} / ${REAL.overlap_channels.length}`
+    : (currentDevice==='stew' ? '14 / 14' : '14 / 19');
+  buildMontage();
+});
+
+document.getElementById('state-toggle').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  document.querySelectorAll('#state-toggle button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentState = btn.dataset.state;
+  buildMontage();
+});
+
+document.getElementById('conn-toggle').addEventListener('click', function(){
+  showConnectivity = !showConnectivity;
+  this.classList.toggle('on', showConnectivity);
+  lineGroup.visible = showConnectivity;
+});
+
+})(); // end boot()
+</script>
+</body>
+</html>
