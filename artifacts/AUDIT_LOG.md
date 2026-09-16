@@ -342,3 +342,9 @@ Compatibility: **visual yes, pipeline no.**
 
 Graphs: Page 3 is supposed to stay static (frozen `ablation.json`). Page 1 traces are frozen 2 s snapshots (one window per demo subject); Play now cycles all demo windows. Page 2 3D rotates; rest/task toggles PSD; slider traces move with degrade.
 
+---
+
+## Dashboard explainer doc -- 2026-09-16
+
+Added `DASHBOARD.md`: every Streamlit control, plot, artifact, and official number (Pages 1-3). Linked from README. Does not change the scorer.
+

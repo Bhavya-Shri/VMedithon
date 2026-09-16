@@ -34,7 +34,7 @@ python -m src.run_all
 streamlit run app/streamlit_app.py --server.port 8765
 ```
 
-Three dashboard pages:
+Three dashboard pages. Full page-by-page explanation: [`DASHBOARD.md`](DASHBOARD.md).
 
 1. Live compare — clinical window vs wearable, before/after GAP-Align
 2. Hardware simulation — teammate 3D montage + degrade slider on the frozen model
