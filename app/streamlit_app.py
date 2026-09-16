@@ -201,57 +201,94 @@ def page_live(demo, meta, ablation) -> None:
             unsafe_allow_html=True,
         )
 
-    subjects = sorted({w["subject"] for w in wearable})
-    c_ctrl1, c_ctrl2, c_ctrl3 = st.columns([2, 2, 1])
+    n_pairs = min(len(wearable), len(clinical))
+    if n_pairs < 1:
+        st.error("demo_windows.json has no paired clinical/wearable snapshots.")
+        return
+
+    def _pair_label(i: int) -> str:
+        ww = wearable[i]
+        cc = clinical[i % len(clinical)]
+        return (
+            f"Slot {i + 1}/{n_pairs} · STEW {ww['subject']} {_label(ww['y'])}  ·  "
+            f"EEGMAT {cc['subject']} {_label(cc['y'])}"
+        )
+
+    c_ctrl1, c_ctrl2, c_ctrl3 = st.columns([3, 2, 1])
     with c_ctrl3:
         play = st.toggle("Play", value=st.session_state.get("playing", False))
         st.session_state.playing = play
     if "w_idx" not in st.session_state:
         st.session_state.w_idx = 0
+    st.session_state.w_idx = int(st.session_state.w_idx) % n_pairs
 
     if play:
-        n_win = max(len(wearable), 1)
-        idx = st.session_state.w_idx % n_win
-        w = wearable[idx]
-        c = clinical[idx % len(clinical)]
+        pack_i = st.session_state.w_idx % n_pairs
         with c_ctrl1:
-            st.caption(f"Streaming subject {w['subject']}")
+            st.caption(f"Streaming {_pair_label(pack_i)}")
         with c_ctrl2:
-            st.caption(f"Window {idx + 1} / {n_win}")
+            st.caption("EEGMAT and STEW are different people; slots are rest-with-rest, load-with-load.")
     else:
         with c_ctrl1:
-            sub = st.selectbox("Wearable subject", subjects, index=0)
-        windows = [w for w in wearable if w["subject"] == sub] or wearable
-        n_win = max(len(windows), 1)
+            pack_i = st.selectbox(
+                "Demo pair (updates BOTH columns)",
+                list(range(n_pairs)),
+                index=st.session_state.w_idx,
+                format_func=_pair_label,
+            )
+            st.session_state.w_idx = pack_i
         with c_ctrl2:
-            if n_win <= 1:
-                st.caption("One frozen snapshot for this subject — change subject or hit Play")
-                idx = 0
-            else:
-                idx = st.slider("Window", 0, n_win - 1, min(st.session_state.w_idx, n_win - 1))
-                st.session_state.w_idx = idx
-        w = windows[idx]
-        c = clinical[idx % len(clinical)]
+            st.caption("Not the same skull. Pack slots 1–5 rest, 6–10 load on both sides.")
+
+    w = wearable[pack_i]
+    c = clinical[pack_i]
     mode = st.radio("Wearable view", ["Before GAP-Align", "After GAP-Align"], horizontal=True)
+    show_after = mode.startswith("After")
+    chart_key = f"p{pack_i}_{'a' if show_after else 'b'}"
 
     left, center, right = st.columns([1.15, 0.85, 1.15])
     with left:
         st.subheader("Clinical · Neurocom / EEGMAT")
-        st.plotly_chart(plot_traces(c["x"], SHARED_CH, title="2 s · 10 shared sites · 128 Hz"), use_container_width=True)
-        st.plotly_chart(plot_bands(c["features"], names), use_container_width=True)
+        st.plotly_chart(
+            plot_traces(c["x"], SHARED_CH, title=f"EEGMAT sub {c['subject']} · {_label(c['y'])} · 2 s"),
+            use_container_width=True,
+            key=f"clin_tr_{chart_key}",
+        )
+        st.plotly_chart(
+            plot_bands(c["features"], names, title="Clinical log band-power (not z-scored)"),
+            use_container_width=True,
+            key=f"clin_bp_{chart_key}",
+        )
         _pred_block("Frozen model", c["pred"], c["proba"], "Hospital-grade stand-in · 19–23 ch wet · 500 Hz → aligned 10 ch 128 Hz")
-        st.caption(f"Subject {c['subject']} · true label: {_label(c['y'])} · frozen 2 s snapshot, not a live headset")
+        st.caption(f"EEGMAT subject {c['subject']} · true label: {_label(c['y'])} · 2 s snapshot")
 
     with right:
         st.subheader("Commercial · Emotiv / wearable")
-        st.plotly_chart(plot_traces(w["x"], SHARED_CH, title="2 s · same montage"), use_container_width=True)
-        feats = w["features_after"] if mode.startswith("After") else w["features_before"]
-        st.plotly_chart(plot_bands(feats, names, title="Band-power at this window"), use_container_width=True)
-        if mode.startswith("After"):
-            _pred_block("After GAP-Align", w["pred_after"], w["proba_after"], "Wearable stand-in · 14 ch saline · native 128 Hz")
+        st.plotly_chart(
+            plot_traces(w["x"], SHARED_CH, title=f"STEW sub {w['subject']} · {_label(w['y'])} · 2 s"),
+            use_container_width=True,
+            key=f"wear_tr_{chart_key}",
+        )
+        feats = w["features_after"] if show_after else w["features_before"]
+        st.plotly_chart(
+            plot_bands(
+                feats,
+                names,
+                title="After z-score (scale ≠ clinical)" if show_after else "Before GAP-Align (raw log-power)",
+            ),
+            use_container_width=True,
+            key=f"wear_bp_{chart_key}",
+        )
+        if show_after:
+            _pred_block("After GAP-Align", w["pred_after"], w["proba_after"], "Same frozen weights. Score this against the STEW eval label, not the EEGMAT column.")
         else:
-            _pred_block("Before GAP-Align", w["pred_before"], w["proba_before"], "Same frozen weights. No new labels.")
-        st.caption(f"Subject {w['subject']} · eval label: {_label(w['y'])} (never used to fit)")
+            _pred_block("Before GAP-Align", w["pred_before"], w["proba_before"], "Naive port. Often stuck on load — that is the collapse.")
+        ok_b = int(w["pred_before"]) == int(w["y"])
+        ok_a = int(w["pred_after"]) == int(w["y"])
+        st.caption(
+            f"STEW subject {w['subject']} · eval label: {_label(w['y'])} (never used to fit) · "
+            f"before {'correct' if ok_b else 'wrong'} → after {'correct' if ok_a else 'wrong'}"
+        )
 
     with center:
         st.markdown("<div class='gap-badge'>Unlabeled adaptation · no STEW labels used to train the classifier</div>", unsafe_allow_html=True)
@@ -263,7 +300,7 @@ def page_live(demo, meta, ablation) -> None:
         st.metric("Kappa before / after", f"{before['kappa']:.2f}  →  {after['kappa']:.2f}")
         st.metric("Macro-F1 after", f"{after['f1']:.3f}")
         st.caption(f"Winner pipeline: {ablation['winner']}. Ghost baseline SCVCNet EEGMAT→STEW = 62.9% (real STEW only).")
-        st.caption("True labels on the wearable are for scoring the dashboard, not for fitting z-score, EA, or the classifier.")
+        st.caption("True labels on the wearable score this window, not the clinical traces. Different people, same rest/load slot.")
 
 
 def page_sim(demo, scaler, clf, meta, ablation) -> None:
@@ -389,8 +426,8 @@ def main() -> None:
 
     if st.session_state.get("playing") and page.startswith("1"):
         time.sleep(0.4)
-        n = max(len(demo["wearable"]), 1)
-        st.session_state.w_idx = (st.session_state.get("w_idx", 0) + 1) % n
+        n = min(len(demo["wearable"]), len(demo["clinical"]))
+        st.session_state.w_idx = (st.session_state.get("w_idx", 0) + 1) % max(n, 1)
         st.rerun()
 
 

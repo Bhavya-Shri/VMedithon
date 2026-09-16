@@ -131,14 +131,13 @@ Layout: **left clinical | center scores | right wearable**.
 
 | Control | What it does | What it signifies |
 |---|---|---|
-| **Wearable subject** | Pick one STEW subject from the 10 demo windows | Demo is not 10,265 windows. It is a **hand-off pack** of snapshots |
-| **Window** | Appears only if that subject has more than one saved window | Today: **one window per demo subject**, so this slider is usually hidden |
-| **Play** | Every 0.4 s advances to the next demo window and **changes subject** | Fake streaming. Not a live headset. Cycles all 10 wearable snapshots |
-| **Wearable view** radio | **Before GAP-Align** vs **After GAP-Align** | Same traces; **different 30-D features and predictions**. Weights stay frozen |
+| **Demo pair** | One dropdown. Slot `i` loads `clinical[i]` **and** `wearable[i]` | EEGMAT and STEW are **different people**. Slots 1–5 rest, 6–10 load |
+| **Play** | Every 0.4 s advances the **pair** | Fake streaming. Both columns move |
+| **Wearable view** radio | **Before GAP-Align** vs **After GAP-Align** | Same STEW traces; **different 30-D features and predictions**. Weights stay frozen |
 
-Play is the one control that makes Page 1 feel alive. Without it, changing **subject** is how you get a new pair of traces.
+Do not pick a STEW id and expect the left column to stay put. A previous bug always showed EEGMAT subject 27 (`clinical[0]`) because each STEW id had one window so the clinical index stayed 0.
 
-The clinical column is paired by index into the 10 clinical snapshots (also 5 rest / 5 load). It is a **matched demo pair**, not “the same person on two headsets.”
+**After vs before looking “more different” from clinical:** that is expected. (1) Score After against the **STEW eval label**, not against the EEGMAT `P(load)`. Before often matches clinical only because **both collapsed to load**. (2) After band-power bars are **z-scored**; they are not on the same vertical scale as clinical log-power. Traces (voltage) do not change when you toggle After.
 
 ### 4.2 Left column — Clinical · Neurocom / EEGMAT
 
@@ -190,9 +189,9 @@ These numbers do **not** change when you move the window. They are the full-set 
 
 ### 4.5 Are Page 1 graphs supposed to move?
 
-- **Traces and band bars:** only when you change subject, window, Play, or Before/After.
-- **Center metrics:** **static.** They are the official n=10265 result.
-- This is **not** a scrolling 2.5-minute STEW file. `demo_windows.json` stores 10+10 frozen 2 s clips so the laptop demo is instant.
+- **Both columns’ traces:** yes, when you change **Demo pair** or hit **Play**. EEGMAT subject id in the left caption must change (27, 15, 23, …).
+- **Center metrics:** **static.** Official n=10265 result.
+- **After vs Before:** voltage traces stay the same; band bars and `P(load)` change.
 
 ---
 

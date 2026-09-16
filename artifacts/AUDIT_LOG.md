@@ -348,3 +348,11 @@ Graphs: Page 3 is supposed to stay static (frozen `ablation.json`). Page 1 trace
 
 Added `DASHBOARD.md`: every Streamlit control, plot, artifact, and official number (Pages 1-3). Linked from README. Does not change the scorer.
 
+---
+
+## Page 1 pairing bug -- 2026-09-16
+
+Bug: wearable subject dropdown filtered to one window so `idx` stayed 0 and left column always showed EEGMAT sub 27 (`clinical[0]`). After-GAP bars also looked “more wrong” vs that frozen clinical because before-GAP and sub 27 both collapsed to load, and after features are z-scored (different scale).
+
+Fix: one **Demo pair** control; slot i loads `clinical[i]` and `wearable[i]` (rest-with-rest, load-with-load, different people). Unique Plotly keys so charts redraw. Caption: score After against STEW eval label, not the EEGMAT column.
+
