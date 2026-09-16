@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import streamlit as st
-import streamlit.components.v1 as components
+import streamlit.components.v1 as st_components
 from scipy.signal import welch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -265,7 +265,7 @@ def page_live(demo, meta, ablation) -> None:
             key=f"clin_tr_{chart_key}",
         )
         st.plotly_chart(
-            plot_bands(c["features"], names, title="Clinical log band-power (sensor µV)", yaxis_title="log10 PSD"),
+            plot_bands(c["features"], names, title="Clinical log band-power (sensor µV · log10 PSD)"),
             use_container_width=True,
             key=f"clin_bp_{chart_key}",
         )
@@ -293,7 +293,6 @@ def page_live(demo, meta, ablation) -> None:
                 title="After: log-power of z-scored EEG (not the clinical scale)"
                 if show_after
                 else "Before: raw log-power (same units as clinical, often still wrong)",
-                yaxis_title="log10 PSD of z-scored EEG" if show_after else "log10 PSD",
             ),
             use_container_width=True,
             key=f"wear_bp_{chart_key}",
@@ -364,7 +363,7 @@ def page_sim(demo, scaler, clf, meta, ablation) -> None:
     html = html_path.read_text(encoding="utf-8")
     payload = hardware_viewer_payload(demo, meta, ablation)
     html = html.replace("/*__GAP_ALIGN_REAL__*/", f"window.GAP_ALIGN_REAL = {json.dumps(payload)};")
-    components.html(html, height=780, scrolling=True)
+    st_components.html(html, height=780, scrolling=True)
 
     with st.expander("2D colour key (Guide Page 2)", expanded=False):
         c1, c2 = st.columns(2)
