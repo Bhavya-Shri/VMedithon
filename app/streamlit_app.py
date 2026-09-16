@@ -58,8 +58,13 @@ def _missing_box() -> None:
     st.stop()
 
 
+def _mtime(name: str) -> float:
+    path = ART / name
+    return path.stat().st_mtime if path.exists() else 0.0
+
+
 @st.cache_data
-def load_json(name: str):
+def load_json(name: str, mtime: float = 0.0):
     path = ART / name
     if not path.exists():
         return None
@@ -178,11 +183,14 @@ def hardware_viewer_payload(demo, meta, ablation) -> dict:
     }
 
 
-def _pred_block(title: str, pred: int, proba, caption: str) -> None:
+def _pred_block(title: str, pred: int, proba, caption: str, true_y: int | None = None) -> None:
     p_load = float(proba[1])
     st.markdown(f"<div class='gap-kicker'>{title}</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='gap-pred'>{_label(pred)}</div>", unsafe_allow_html=True)
     st.progress(min(max(p_load, 0.0), 1.0), text=f"P(cognitive load) = {p_load:.2f}")
+    if true_y is not None:
+        ok = int(pred) == int(true_y)
+        st.caption(("Correct" if ok else "Wrong") + f" vs true {_label(true_y)}")
     st.caption(caption)
 
 
@@ -255,12 +263,23 @@ def page_live(demo, meta, ablation) -> None:
             key=f"clin_tr_{chart_key}",
         )
         st.plotly_chart(
-            plot_bands(c["features"], names, title="Clinical log band-power (not z-scored)"),
+            plot_bands(
+                c["features"],
+                names,
+                title="What the frozen model sees (source EA + log band-power)",
+                yaxis_title="log10 PSD",
+            ),
             use_container_width=True,
             key=f"clin_bp_{chart_key}",
         )
-        _pred_block("Frozen model", c["pred"], c["proba"], "Hospital-grade stand-in · 19–23 ch wet · 500 Hz → aligned 10 ch 128 Hz")
-        st.caption(f"EEGMAT subject {c['subject']} · true label: {_label(c['y'])} · 2 s snapshot")
+        _pred_block(
+            "Frozen model",
+            c["pred"],
+            c["proba"],
+            "EEGMAT path: P3 reref → 10 ch → 128 Hz → source EA → 30-D logBP → scaler → logreg. Traces above are pre-EA µV.",
+            true_y=c["y"],
+        )
+        st.caption(f"EEGMAT subject {c['subject']} · true label: {_label(c['y'])}")
 
     with right:
         st.subheader("Commercial · Emotiv / wearable")
@@ -274,19 +293,36 @@ def page_live(demo, meta, ablation) -> None:
             plot_bands(
                 feats,
                 names,
-                title="After z-score (scale ≠ clinical)" if show_after else "Before GAP-Align (raw log-power)",
+                title="Winner C: log-power AFTER unlabeled channel z-score" if show_after else "Pipeline A: log-power, no adapter",
+                yaxis_title="log10 PSD of z-scored EEG" if show_after else "log10 PSD",
             ),
             use_container_width=True,
             key=f"wear_bp_{chart_key}",
         )
+        pb, pa = w["proba_before"][1], w["proba_after"][1]
+        m1, m2 = st.columns(2)
+        m1.metric("P(load) before", f"{float(pb):.2f}")
+        m2.metric("P(load) after", f"{float(pa):.2f}", delta=f"{(float(pa)-float(pb)):+.2f}")
         if show_after:
-            _pred_block("After GAP-Align", w["pred_after"], w["proba_after"], "Same frozen weights. Score this against the STEW eval label, not the EEGMAT column.")
+            _pred_block(
+                "After GAP-Align",
+                w["pred_after"],
+                w["proba_after"],
+                "Score vs STEW eval label. Bars are not on the clinical µV-PSD scale.",
+                true_y=w["y"],
+            )
         else:
-            _pred_block("Before GAP-Align", w["pred_before"], w["proba_before"], "Naive port. Often stuck on load — that is the collapse.")
+            _pred_block(
+                "Before GAP-Align",
+                w["pred_before"],
+                w["proba_before"],
+                "Naive port. Rest windows often look like load — that is the collapse.",
+                true_y=w["y"],
+            )
         ok_b = int(w["pred_before"]) == int(w["y"])
         ok_a = int(w["pred_after"]) == int(w["y"])
         st.caption(
-            f"STEW subject {w['subject']} · eval label: {_label(w['y'])} (never used to fit) · "
+            f"STEW subject {w['subject']} · eval {_label(w['y'])} (never used to fit) · "
             f"before {'correct' if ok_b else 'wrong'} → after {'correct' if ok_a else 'wrong'}"
         )
 
@@ -330,7 +366,7 @@ def page_sim(demo, scaler, clf, meta, ablation) -> None:
             st.caption("AF3 / AF4 / FC5 / FC6 are on the headset but not in the model. DRL at P4.")
 
     st.markdown("**Degrade slider — this is the model-linked hardware sim**")
-    st.caption("Same frozen scaler/clf as Page 1. Slider uses `slider_degrade` / `fake_emotiv`.")
+    st.caption("Same frozen scaler/clf as Page 1. Slider uses `slider_degrade` / `fake_emotiv` on sensor µV (SNR/14-bit), then logBP — it does not re-fit per-subject EA.")
 
     if scaler is None or clf is None:
         st.warning("Frozen model artifacts missing — slider will not move P(load).")
@@ -396,9 +432,9 @@ def main() -> None:
     st.title("Hospital EEG knowledge, unlocked for a wearable")
     st.caption("Train on EEGMAT (Neurocom). Test on STEW (Emotiv EPOC). Rest vs cognitive load. Zero target labels for fitting.")
 
-    demo = load_json("demo_windows.json")
-    meta = load_json("train_meta.json")
-    ablation = load_json("ablation.json")
+    demo = load_json("demo_windows.json", _mtime("demo_windows.json"))
+    meta = load_json("train_meta.json", _mtime("train_meta.json"))
+    ablation = load_json("ablation.json", _mtime("ablation.json"))
     scaler, clf = load_models()
 
     page = st.sidebar.radio(

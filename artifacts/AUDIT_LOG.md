@@ -356,3 +356,11 @@ Bug: wearable subject dropdown filtered to one window so `idx` stayed 0 and left
 
 Fix: one **Demo pair** control; slot i loads `clinical[i]` and `wearable[i]` (rest-with-rest, load-with-load, different people). Unique Plotly keys so charts redraw. Caption: score After against STEW eval label, not the EEGMAT column.
 
+---
+
+## Page 1 model-path rewire -- 2026-09-16
+
+Bug: clinical features/preds used raw logBP while the frozen logreg was trained with **source EA**. Rest windows (e.g. EEGMAT 15) showed as load. Wearable slot 5 was STEW 09 already correct before GAP-Align, so After looked like a random scale change (negative z-scored log-power vs clinical log PSD).
+
+Fix: rebuild `demo_windows.json` via `python -m src.evaluate` without refitting. Clinical = source EA + logBP + scaler. Wearable rest slots = before load / after rest. Band y-axis after = log10 PSD of z-scored EEG. Always show P(load) before and after. Ablation numbers unchanged (n=10265).
+

@@ -135,9 +135,16 @@ Layout: **left clinical | center scores | right wearable**.
 | **Play** | Every 0.4 s advances the **pair** | Fake streaming. Both columns move |
 | **Wearable view** radio | **Before GAP-Align** vs **After GAP-Align** | Same STEW traces; **different 30-D features and predictions**. Weights stay frozen |
 
-Do not pick a STEW id and expect the left column to stay put. A previous bug always showed EEGMAT subject 27 (`clinical[0]`) because each STEW id had one window so the clinical index stayed 0.
+**Wiring (do not mix these):**
 
-**After vs before looking “more different” from clinical:** that is expected. (1) Score After against the **STEW eval label**, not against the EEGMAT `P(load)`. Before often matches clinical only because **both collapsed to load**. (2) After band-power bars are **z-scored**; they are not on the same vertical scale as clinical log-power. Traces (voltage) do not change when you toggle After.
+- Traces = sensor µV after preprocess (no adapter).
+- Clinical bars/pred = **source EA + log band-power + scaler + logreg** (same as training).
+- Wearable Before = pipeline **A** (logBP + scaler, no z-score).
+- Wearable After = winner **C** (unlabeled channel z-score, then logBP + same scaler/logreg).
+- After bars use a different y-axis (`log10 PSD of z-scored EEG`). Do not compare their height to clinical bars.
+- Rest slots are chosen as STEW **collapse → recovery** (before = load, after = rest). Load slots stay load on both sides.
+
+Center numbers are still the full n=10265 table, not these 10 windows.
 
 ### 4.2 Left column — Clinical · Neurocom / EEGMAT
 

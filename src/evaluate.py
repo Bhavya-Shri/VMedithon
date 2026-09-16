@@ -185,6 +185,7 @@ def run_ablation(
         "winner_id": winner_id,
         "winner_zscore": winner_id in ("C", "D", "E"),
         "winner_ea": winner_id in ("D", "E"),
+        "ea_on_source": bool(source_spec.get("ea", True)),
     }
 
 
@@ -199,25 +200,26 @@ def save_demo_windows(
     *,
     n_each: int = 10,
 ) -> Path:
+    """Build Page 1 pairs. Traces stay sensor µV. Features/preds use the same path as the frozen model."""
     rng = np.random.default_rng(RANDOM_SEED)
     from src.alignment import apply_gap
 
+    n_rest = max(n_each // 2, 1)
+    n_load = max(n_each - n_rest, 1)
+    ea_src = bool(pack.get("ea_on_source", True))
+    X_src_model = apply_gap(X_src, sub_src, zscore=False, ea=True) if ea_src else np.asarray(X_src)
     X_after = apply_gap(
         X_tgt,
         sub_tgt,
         zscore=pack["winner_zscore"],
         ea=pack["winner_ea"],
     )
-    clinical = _pick_clinical(X_src, y_src, sub_src, pack["scaler"], pack["clf"], n_each, rng)
-    wearable = _pick_wearable(
-        X_tgt,
-        X_after,
-        y_tgt,
-        sub_tgt,
-        pack,
-        n_each,
-        rng,
-    )
+    rest_c = _pick_clinical_indices(X_src_model, y_src, sub_src, pack["scaler"], pack["clf"], 0, n_rest, rng)
+    load_c = _pick_clinical_indices(X_src_model, y_src, sub_src, pack["scaler"], pack["clf"], 1, n_load, rng)
+    rest_w = _pick_wearable_indices(y_tgt, sub_tgt, pack, 0, n_rest, rng)
+    load_w = _pick_wearable_indices(y_tgt, sub_tgt, pack, 1, n_load, rng)
+    clinical = [_clinical_record(X_src, X_src_model, y_src, sub_src, pack, i) for i in rest_c + load_c]
+    wearable = [_wearable_record(X_tgt, X_after, y_tgt, sub_tgt, pack, i) for i in rest_w + load_w]
     payload = {
         "ch": list(SHARED_CH),
         "sfreq": 128.0,
@@ -226,61 +228,138 @@ def save_demo_windows(
         "clinical": clinical,
         "wearable": wearable,
         "winner": pack["winner_id"],
+        "ea_on_source": ea_src,
+        "pairing": "slots 1-N rest, then load; different people; clinical feats include source EA if trained with it",
     }
     path = ART / "demo_windows.json"
     path.write_text(json.dumps(payload))
     return path
 
 
-def _balanced_indices(y, n_each, rng) -> np.ndarray:
-    chosen = []
-    for label in (0, 1):
-        idx = np.where(y == label)[0]
-        if len(idx) == 0:
+def _take_unique(indices, subjects, k, rng) -> list[int]:
+    indices = np.asarray(indices, dtype=int)
+    if len(indices) == 0 or k <= 0:
+        return []
+    order = np.arange(len(indices))
+    rng.shuffle(order)
+    picked, seen = [], set()
+    for j in order:
+        i = int(indices[j])
+        s = str(subjects[i])
+        if s in seen:
             continue
-        take = rng.choice(idx, size=min(max(n_each // 2, 1), len(idx)), replace=False)
-        chosen.extend(int(i) for i in take)
-    return np.array(chosen, dtype=int)
+        seen.add(s)
+        picked.append(i)
+        if len(picked) >= k:
+            return picked
+    for j in order:
+        i = int(indices[j])
+        if i not in picked:
+            picked.append(i)
+        if len(picked) >= k:
+            break
+    return picked
 
 
-def _pick_clinical(X, y, subjects, scaler, clf, n_each, rng) -> list[dict]:
-    chosen = []
-    for i in _balanced_indices(y, n_each, rng):
-        epoch = X[i]
-        pred, proba = predict_features(transform_epochs(epoch[None, ...]), scaler, clf)
-        chosen.append(
-            {
-                "subject": str(subjects[i]),
-                "y": int(y[i]),
-                "x": epoch.astype(float).tolist(),
-                "pred": int(pred[0]),
-                "proba": [float(proba[0, 0]), float(proba[0, 1])],
-                "features": transform_epochs(epoch[None, ...])[0].astype(float).tolist(),
-            }
-        )
-    return chosen
+def _pick_clinical_indices(X_model, y, subjects, scaler, clf, label: int, k: int, rng) -> list[int]:
+    feats = transform_epochs(X_model)
+    pred, _ = predict_features(feats, scaler, clf)
+    y = np.asarray(y)
+    ok = np.where((y == label) & (pred == label))[0]
+    any_lab = np.where(y == label)[0]
+    picked = _take_unique(ok, subjects, k, rng)
+    if len(picked) < k:
+        extra = _take_unique(any_lab, subjects, k - len(picked), rng)
+        picked.extend(i for i in extra if i not in picked)
+    return picked[:k]
 
 
-def _pick_wearable(X, X_after, y, subjects, pack, n_each, rng) -> list[dict]:
-    chosen = []
-    for i in _balanced_indices(y, n_each, rng):
-        epoch = X[i]
-        feat_b = transform_epochs(epoch[None, ...])[0]
-        feat_a = transform_epochs(X_after[i][None, ...])[0]
-        chosen.append(
-            {
-                "subject": str(subjects[i]),
-                "y": int(y[i]),
-                "x": epoch.astype(float).tolist(),
-                "features_before": feat_b.astype(float).tolist(),
-                "features_after": feat_a.astype(float).tolist(),
-                "pred_before": int(pack["pred_a"][i]),
-                "proba_before": [float(pack["proba_a"][i, 0]), float(pack["proba_a"][i, 1])],
-                "pred_after": int(pack["after_pred"][i]),
-                "proba_after": [float(pack["after_proba"][i, 0]), float(pack["after_proba"][i, 1])],
-            }
-        )
-    return chosen
+def _pick_wearable_indices(y, subjects, pack, label: int, k: int, rng) -> list[int]:
+    y = np.asarray(y)
+    pred_b = np.asarray(pack["pred_a"])
+    pred_a = np.asarray(pack["after_pred"])
+    if label == 0:
+        prefer = np.where((y == 0) & (pred_b == 1) & (pred_a == 0))[0]
+        fallback = np.where((y == 0) & (pred_a == 0))[0]
+        last = np.where(y == 0)[0]
+    else:
+        prefer = np.where((y == 1) & (pred_a == 1))[0]
+        fallback = np.where(y == 1)[0]
+        last = fallback
+    picked = _take_unique(prefer, subjects, k, rng)
+    if len(picked) < k:
+        picked.extend(i for i in _take_unique(fallback, subjects, k - len(picked), rng) if i not in picked)
+    if len(picked) < k:
+        picked.extend(i for i in _take_unique(last, subjects, k - len(picked), rng) if i not in picked)
+    return picked[:k]
+
+
+def _clinical_record(X_raw, X_model, y, subjects, pack, i: int) -> dict:
+    feat = transform_epochs(X_model[i][None, ...])
+    pred, proba = predict_features(feat, pack["scaler"], pack["clf"])
+    return {
+        "subject": str(subjects[i]),
+        "y": int(y[i]),
+        "x": np.asarray(X_raw[i], dtype=float).tolist(),
+        "pred": int(pred[0]),
+        "proba": [float(proba[0, 0]), float(proba[0, 1])],
+        "features": feat[0].astype(float).tolist(),
+        "model_path": "source_EA+logBP+scaler" if pack.get("ea_on_source", True) else "logBP+scaler",
+    }
+
+
+def _wearable_record(X_raw, X_after, y, subjects, pack, i: int) -> dict:
+    feat_b = transform_epochs(np.asarray(X_raw[i])[None, ...])[0]
+    feat_a = transform_epochs(np.asarray(X_after[i])[None, ...])[0]
+    return {
+        "subject": str(subjects[i]),
+        "y": int(y[i]),
+        "x": np.asarray(X_raw[i], dtype=float).tolist(),
+        "features_before": feat_b.astype(float).tolist(),
+        "features_after": feat_a.astype(float).tolist(),
+        "pred_before": int(pack["pred_a"][i]),
+        "proba_before": [float(pack["proba_a"][i, 0]), float(pack["proba_a"][i, 1])],
+        "pred_after": int(pack["after_pred"][i]),
+        "proba_after": [float(pack["after_proba"][i, 0]), float(pack["after_proba"][i, 1])],
+        "model_path_before": "logBP+scaler (pipeline A)",
+        "model_path_after": "unlabeled z-score+logBP+scaler (winner C)"
+        if pack["winner_id"] == "C"
+        else f"adapter {pack['winner_id']}+logBP+scaler",
+    }
+
+
+def rebuild_demo_windows_from_artifacts(*, n_each: int = 10) -> Path:
+    """Rebuild demo_windows.json from frozen npz/joblib/preds. Does not refit the classifier."""
+    import joblib
+
+    from config import DATA_PROC
+
+    src = np.load(DATA_PROC / "eegmat_epochs.npz")
+    tgt = np.load(DATA_PROC / "stew_epochs.npz")
+    before = np.load(ART / "stew_preds_before.npz")
+    after = np.load(ART / "stew_preds_after.npz")
+    meta = json.loads((ART / "train_meta.json").read_text())
+    table = json.loads((ART / "ablation.json").read_text())
+    winner = table["winner"]
+    pack = {
+        "scaler": joblib.load(ART / "scaler.joblib"),
+        "clf": joblib.load(ART / "clf.joblib"),
+        "pred_a": before["pred"],
+        "proba_a": before["proba"],
+        "after_pred": after["pred"],
+        "after_proba": after["proba"],
+        "winner_id": winner,
+        "winner_zscore": winner in ("C", "D", "E"),
+        "winner_ea": winner in ("D", "E"),
+        "ea_on_source": bool(meta.get("ea_on_source", True)),
+    }
+    if len(tgt["y"]) != len(before["pred"]) or len(tgt["y"]) != len(after["pred"]):
+        raise RuntimeError("stew_preds_*.npz length does not match stew_epochs.npz — rerun python -m src.run_all")
+    path = save_demo_windows(
+        src["X"], src["y"], src["subject"], tgt["X"], tgt["y"], tgt["subject"], pack, n_each=n_each
+    )
+    print(f"wrote {path}")
+    return path
 
 
 def print_markdown_table(table: dict) -> None:
@@ -294,3 +373,7 @@ def print_markdown_table(table: dict) -> None:
     print("Ghost baseline SCVCNet EEGMAT→STEW (no target labels): 0.629 acc")
     if table["target_source"] != "stew":
         print("WARNING: target is NOT STEW. Do not quote these as STEW numbers.")
+
+
+if __name__ == "__main__":
+    rebuild_demo_windows_from_artifacts()
